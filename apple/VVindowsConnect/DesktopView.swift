@@ -30,6 +30,7 @@ struct DesktopView: View {
         .onAppear {
             if desktop.windowOpen || desktop.state == .idle { return toHome() }
             desktop.windowOpen = true
+            dismissWindow(id: "home")
         }
         .onDisappear {
             desktop.windowOpen = false

@@ -51,7 +51,6 @@ struct HomeView: View {
     private func connect(_ pair: SavedPair) {
         desktop.connect(to: pair)
         openWindow(id: "desktop")
-        dismissWindow(id: "home")
     }
 
     private var status: String {
