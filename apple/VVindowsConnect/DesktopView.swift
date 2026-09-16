@@ -32,9 +32,13 @@ struct DesktopView: View {
             desktop.disconnect()
         }
         .ornament(attachmentAnchor: .scene(.top)) {
-            Button("Disconnect") {
-                desktop.disconnect()
-                dismissWindow()
+            HStack(spacing: 16) {
+                Button("Disconnect") {
+                    desktop.disconnect()
+                    dismissWindow()
+                }
+                Text(desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
+                    .font(.caption.monospaced())
             }
             .padding(8)
             .glassBackgroundEffect()

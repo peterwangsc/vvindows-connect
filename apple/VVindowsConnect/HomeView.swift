@@ -4,6 +4,7 @@ struct HomeView: View {
     let connection: Connection
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var showingSettings = false
 
     var body: some View {
@@ -17,6 +18,11 @@ struct HomeView: View {
             }
             .padding(32)
             .navigationTitle("vindOS")
+            .onAppear {
+                connection.homeWindows += 1
+                if connection.homeWindows > 1 { dismissWindow() }
+            }
+            .onDisappear { connection.homeWindows -= 1 }
             .toolbar {
                 Button("Settings", systemImage: "gear") { showingSettings = true }
             }
