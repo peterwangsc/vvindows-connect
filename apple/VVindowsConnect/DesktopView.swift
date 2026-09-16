@@ -129,7 +129,7 @@ struct ImmersiveContent: View {
                 .controlSize(.large)
                 .padding(20)
                 .glassBackgroundEffect()
-                .frame(width: 2400, height: 1400)
+                .frame(width: 20000, height: 12000)
                 .contentShape(Rectangle())
                 .onTapGesture { hudShown = false }
             }
