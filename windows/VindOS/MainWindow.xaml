@@ -14,15 +14,18 @@
         <TextBlock x:Name="StatusText" TextWrapping="Wrap" FontSize="16" />
         <Image x:Name="Qr" Grid.Row="1" Margin="0,16" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" Visibility="Collapsed" />
         <StackPanel Grid.Row="2" Margin="0,0,0,12">
-            <TextBlock x:Name="GamesHeader" Margin="0,0,0,6" Opacity="0.7" />
-            <StackPanel x:Name="GamesPanel" />
+            <TextBlock x:Name="SteamText" TextWrapping="Wrap" Margin="0,0,0,8" Opacity="0.85" />
+            <Button x:Name="SteamButton" Content="Restart Steam through vindOS" Height="36" Click="Steam_Click" />
         </StackPanel>
         <Button x:Name="PairButton" Grid.Row="3" Content="Pair" Height="44" FontSize="16" Click="Pair_Click" />
         <Expander Grid.Row="4" Header="Settings" Margin="0,12,0,0" Foreground="White">
             <StackPanel Margin="0,8,0,0">
                 <TextBlock x:Name="HostText" Margin="0,0,0,8" Opacity="0.7" />
-                <Button x:Name="ForgetButton" Content="Forget connection" Height="36" Click="Forget_Click" />
-                <Button x:Name="RescanButton" Content="Rescan Steam library" Height="36" Margin="0,8,0,0" Click="Rescan_Click" />
+                <TextBlock x:Name="GamesText" TextWrapping="Wrap" Margin="0,0,0,8" Opacity="0.7" />
+                <Button x:Name="RescanButton" Content="Rescan Steam library" Height="36" Click="Rescan_Click" />
+                <Button x:Name="BridgeButton" Content="Apply OpenVR bridges" Height="36" Margin="0,8,0,0" Click="Bridge_Click" />
+                <Button x:Name="UnbridgeButton" Content="Remove OpenVR bridges" Height="36" Margin="0,8,0,0" Click="Unbridge_Click" />
+                <Button x:Name="ForgetButton" Content="Forget connection" Height="36" Margin="0,8,0,0" Click="Forget_Click" />
             </StackPanel>
         </Expander>
     </Grid>

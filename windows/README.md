@@ -114,24 +114,49 @@ only its signaling and the desktop stream are.
 
 ## Games
 
-`Steam.cs` scans the Steam library at startup and on "Rescan Steam library":
-every `appmanifest_*.acf` across `libraryfolders.vdf`, joined to the binary
+Games are started from Steam, the way Peter already starts them. vindOS does
+not launch games and shows no Play list; the headset shows none either.
+
+Steam must carry the runtime. "Restart Steam through vindOS" shuts Steam down
+(`steam.exe -shutdown`, measured 2 s), then starts it with `XR_RUNTIME_JSON`
+set to the CloudXR runtime json. Every game Steam launches inherits that
+environment: measured 2026-09-16 15:31 with a marker variable, present in
+`steam.exe`, every `steamwebhelper.exe`, and `AssettoCorsa.exe` launched by
+`steam://rungameid/244210`, which also carried `SteamAppId=244210`. The status
+line under the button reads `steam.exe`'s environment block (`ProcessEnv.cs`,
+PEB → RTL_USER_PROCESS_PARAMETERS) and says whether Steam currently runs
+through vindOS; it is not remembered anywhere else.
+
+`Steam.cs` scans the library on startup and on "Rescan Steam library": every
+`appmanifest_*.acf` across `libraryfolders.vdf`, joined to the binary
 `appcache/appinfo.vdf` (format 0x07564429, string-table keys). A title is a VR
 game when its `common` block carries `openvrsupport` or `openxrsupport`, or a
-launch entry is typed `vr` or `openxr`; the launch entry is the Windows,
-non-32-bit, non-beta one, preferring the VR-typed entry, then the untyped one.
-Assetto Corsa resolves to `AssettoCorsa.exe` (its launcher), which starts
-`acs.exe` inside the same job object. No list is kept on disk; the scan is
-milliseconds.
+launch entry is typed `vr` or `openxr`. The list is shown in Settings with each
+title's bridge state.
 
-The vindOS window shows one Play button per VR game. Play while the headset is
-in Immersive Mode ends the desktop quad and launches the game with
-`XR_RUNTIME_JSON` on the CloudXR runtime; OpenVR titles get the OpenComposite
-`openvr_api.dll` from `vendor/opencomposite/` copied over every 64-bit
-`openvr_api.dll` in their install (original kept beside it as
-`*.vindos-original`), and that directory prepended to PATH. Play while windowed
-launches the same executable with no runtime environment, so the game runs flat
-on the desktop. The job object counts live processes; when it reaches zero the
-quad session restarts and the headset gets `game{running:false}`. Stop
-terminates the job. `recenter` from the headset sends Ctrl+Space when the
-foreground window belongs to the job, otherwise re-places the quad.
+OpenVR titles need the OpenComposite bridge: "Apply OpenVR bridges" copies
+`vendor/opencomposite/openvr_api.dll` over every 64-bit `openvr_api.dll` under
+each OpenVR title's install directory, keeping the original beside it as
+`openvr_api.dll.vindos-original`; "Remove OpenVR bridges" puts the originals
+back and deletes the copies. OpenXR titles need nothing. Nothing touches game
+files without one of those two clicks.
+
+While the headset is in Immersive Mode the quad shows the desktop and Peter
+presses Play in Steam on it. `VrWatch.cs` polls every 500 ms for a process
+other than vindOS that has `openvr_api.dll` or `openxr_loader.dll` loaded;
+when one appears the host disposes its quad session so the game's OpenXR
+session can attach, logs the process, its `SteamAppId` and whether it
+inherited the vindOS runtime, and sends `game{id,running:true}` to the
+headset. When that process exits the quad session restarts and
+`game{id,running:false}` follows. `recenter` sends Ctrl+Space when that
+process owns the foreground window, otherwise re-places the quad. `windowed`
+leaves the game running on the PC. Games started from Steam while windowed run
+flat, and a VR launch then fails the same way it would with no runtime
+installed.
+
+Measured 2026-09-16 15:13–15:19 with the earlier host-launched variant: the
+Stream Manager's `AppConnected` flag is set by the host's own quad session, so
+it cannot signal a game attaching while the quad is up; the module poll is the
+signal. Hand-off on that run: `acs.exe` loaded the bridge, the quad yielded
+74 ms later, `AppConnected` dropped and returned within 0.5 s as Assetto's
+session attached, the headset client stayed connected throughout.

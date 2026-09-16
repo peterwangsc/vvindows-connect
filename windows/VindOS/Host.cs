@@ -15,8 +15,7 @@ sealed class Host : IDisposable
     public event Action<byte[]?>? QrChanged;
     public event Action<Pair?>? PairChanged;
     public event Action<bool>? ImmersiveChanged;
-    public event Action<GameEntry?>? GameChanged;
-    public event Action<IReadOnlyList<GameEntry>>? GamesChanged;
+    public event Action? GamesChanged;
 
     readonly HostIdentity _identity;
     readonly TcpListener _listener = new(IPAddress.Any, 0);
@@ -27,7 +26,7 @@ sealed class Host : IDisposable
     NetworkStream? _stream;
     Session? _session;
     XrSession? _xr;
-    Game? _game;
+    VrWatch? _watch;
     bool _armed, _immersive;
     IReadOnlyList<GameEntry> _games = [];
     readonly SemaphoreSlim _lifecycle = new(1, 1);
@@ -48,7 +47,7 @@ sealed class Host : IDisposable
         _desktop.StatusChanged += s => { if (s is null) Idle(); else StatusChanged?.Invoke(s); };
         _desktop.ImmersiveRequested = BeginImmersiveAsync;
         _desktop.DesktopRequested = EndImmersiveAsync;
-        _desktop.RecenterRequested = () => { if (_game is { Immersive: true }) return _game.Recenter(); if (_xr is null) return false; _xr.Recenter(); return true; };
+        _desktop.RecenterRequested = () => { if (_watch?.Recenter() == true) return true; if (_xr is null) return false; _xr.Recenter(); return true; };
         Rescan();
         _listener.Start();
         _desktop.ApplePort = ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -62,8 +61,28 @@ sealed class Host : IDisposable
     {
         try { _games = Steam.Scan(); }
         catch (Exception e) { Log.Write($"steam scan failed {e.GetType().Name} {e.Message}"); _games = []; }
-        Log.Write($"vr games: {string.Join(", ", _games.Select(g => $"{g.Id} {g.Name} ({g.Api}, {Path.GetFileName(g.Exe)})"))}");
-        GamesChanged?.Invoke(_games);
+        Log.Write($"vr games: {string.Join(", ", _games.Select(g => $"{g.Id} {g.Name} ({g.Api}, {Path.GetFileName(g.Exe)}, {Bridge.State(g)})"))}");
+        GamesChanged?.Invoke();
+    }
+
+    public string ApplyBridges()
+    {
+        try { Bridge.Apply(_games); } catch (Exception e) { Log.Write($"bridge apply failed {e.Message}"); return e.Message; }
+        GamesChanged?.Invoke();
+        return "Bridges applied.";
+    }
+
+    public string RemoveBridges()
+    {
+        try { Bridge.Remove(_games); } catch (Exception e) { Log.Write($"bridge remove failed {e.Message}"); return e.Message; }
+        GamesChanged?.Invoke();
+        return "Bridges removed; the games' original openvr_api.dll files are back.";
+    }
+
+    public async Task<string> RestartSteamAsync()
+    {
+        try { await Steam.RestartAsync(_cts.Token); } catch (Exception e) { Log.Write($"steam restart failed {e.Message}"); return e.Message; }
+        return "Steam restarted through vindOS.";
     }
 
     public void Arm()
@@ -205,87 +224,47 @@ sealed class Host : IDisposable
         {
             if (_immersive) return null;
             var error = await StartXrAsync(null, true);
-            if (error is null) { _immersive = true; ImmersiveChanged?.Invoke(true); StatusChanged?.Invoke("Immersive Mode ready. Waiting for Vision Pro."); }
+            if (error is null)
+            {
+                _immersive = true;
+                _watch = new VrWatch();
+                _watch.Started += (pid, name, id) => _ = YieldQuadAsync(id);
+                _watch.Ended += (pid, id) => _ = RestoreQuadAsync(id);
+                ImmersiveChanged?.Invoke(true);
+                StatusChanged?.Invoke("Immersive Mode ready. Waiting for Vision Pro.");
+            }
             return error;
         }
         finally { _lifecycle.Release(); }
     }
 
-    public async Task<string?> PlayAsync(GameEntry entry)
-    {
-        await _lifecycle.WaitAsync(_cts.Token);
-        var immersive = false;
-        try
-        {
-            if (_game is not null) return _game.Running ? $"{_game.Entry.Name} is already running." : "The previous game is still closing.";
-            immersive = _immersive;
-            try { _game = new Game(entry, immersive); }
-            catch (Exception e)
-            {
-                Log.Write($"game {entry.Id} start failed {e.Message}");
-                return e.Message;
-            }
-            var game = _game;
-            game.Exited += code => _ = OnGameExitedAsync(game, code);
-            game.VrLoaded += module => _ = YieldQuadAsync(game);
-            game.VrEnded += () => _ = RestoreQuadAsync(game);
-            GameChanged?.Invoke(entry);
-            StatusChanged?.Invoke(immersive ? $"{entry.Name} is running in Immersive Mode." : $"{entry.Name} is running on the desktop.");
-            _ = Task.Delay(TimeSpan.FromSeconds(8), _cts.Token).ContinueWith(_ => Log.Write($"foreground after game start: {Game.Foreground()}"), TaskContinuationOptions.OnlyOnRanToCompletion);
-        }
-        finally { _lifecycle.Release(); }
-        if (immersive) await _desktop.GameStartedAsync(entry.Id);
-        return null;
-    }
-
-    public void StopGame() => _game?.Stop();
-
-    async Task RestoreQuadAsync(Game game)
+    async Task YieldQuadAsync(string id)
     {
         await _lifecycle.WaitAsync(_cts.Token);
         try
         {
-            if (!ReferenceEquals(_game, game) || !_immersive || _xr is not null) return;
-            var error = await StartXrAsync(null, true);
-            Log.Write(error is null ? $"quad restored while {game.Entry.Id} launcher runs" : $"quad restart failed {error}");
-        }
-        finally { _lifecycle.Release(); }
-    }
-
-    async Task YieldQuadAsync(Game game)
-    {
-        await _lifecycle.WaitAsync(_cts.Token);
-        try
-        {
-            if (!ReferenceEquals(_game, game) || !_immersive || _xr is null) return;
+            if (!_immersive || _xr is null) return;
             _xr.Dispose();
             _xr = null;
-            Log.Write($"quad yielded to {game.Entry.Id}");
+            Log.Write($"quad yielded to {id}");
+            StatusChanged?.Invoke("A VR game is running on the Vision Pro.");
         }
         finally { _lifecycle.Release(); }
+        await _desktop.GameStartedAsync(id);
     }
 
-    async Task OnGameExitedAsync(Game game, int code)
+    async Task RestoreQuadAsync(string id)
     {
         await _lifecycle.WaitAsync(_cts.Token);
-        var restore = false;
         try
         {
-            if (!ReferenceEquals(_game, game)) return;
-            _game = null;
-            game.Dispose();
-            GameChanged?.Invoke(null);
-            restore = _immersive;
-            if (restore)
-            {
-                var error = await StartXrAsync(null, true);
-                if (error is not null) Log.Write($"quad restart failed {error}");
-                StatusChanged?.Invoke("Vision Pro is in Immersive Mode.");
-            }
-            else Idle();
+            if (!_immersive || _xr is not null) return;
+            var error = await StartXrAsync(null, true);
+            Log.Write(error is null ? $"quad restored after {id}" : $"quad restart failed {error}");
+            StatusChanged?.Invoke("Vision Pro is in Immersive Mode.");
         }
         finally { _lifecycle.Release(); }
-        if (restore) await _desktop.GameEndedAsync(game.Entry.Id, $"exited with code {code}");
+        await _desktop.GameEndedAsync(id, "exited");
     }
 
     async Task EndImmersiveAsync()
@@ -323,7 +302,8 @@ sealed class Host : IDisposable
     void TearDown()
     {
         _session = null;
-        if (_game is not null) { var game = _game; _game = null; game.Dispose(); GameChanged?.Invoke(null); }
+        _watch?.Dispose();
+        _watch = null;
         _xr?.Dispose();
         _xr = null;
         _ = Task.Run(_manager.StopService);
