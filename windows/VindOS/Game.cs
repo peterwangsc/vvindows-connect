@@ -74,6 +74,7 @@ sealed class Game : IDisposable
     readonly Process _process;
     readonly Timer _watch;
     public GameEntry Entry { get; }
+    public bool Immersive { get; }
     public event Action<int>? Exited;
     public event Action<string>? VrLoaded;
     bool _vr;
@@ -81,6 +82,7 @@ sealed class Game : IDisposable
     public Game(GameEntry entry, bool immersive)
     {
         Entry = entry;
+        Immersive = immersive;
         if (!File.Exists(entry.Exe)) throw new InvalidOperationException($"{entry.Name} is not installed.");
         var bridgeDir = immersive ? Bridge(entry) : null;
         var start = new ProcessStartInfo(entry.Exe) { WorkingDirectory = entry.WorkingDir, UseShellExecute = false };

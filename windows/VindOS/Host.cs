@@ -48,7 +48,7 @@ sealed class Host : IDisposable
         _desktop.StatusChanged += s => { if (s is null) Idle(); else StatusChanged?.Invoke(s); };
         _desktop.ImmersiveRequested = BeginImmersiveAsync;
         _desktop.DesktopRequested = EndImmersiveAsync;
-        _desktop.RecenterRequested = () => { if (_game is not null) return _game.Recenter(); if (_xr is null) return false; _xr.Recenter(); return true; };
+        _desktop.RecenterRequested = () => { if (_game is { Immersive: true }) return _game.Recenter(); if (_xr is null) return false; _xr.Recenter(); return true; };
         Rescan();
         _listener.Start();
         _desktop.ApplePort = ((IPEndPoint)_listener.LocalEndpoint).Port;
