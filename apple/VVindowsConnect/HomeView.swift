@@ -35,6 +35,9 @@ struct HomeView: View {
                     if desktop.immersion == .on { dismissWindow(id: "home") }
                 }
             }
+            .onChange(of: desktop.immersion) { _, immersion in
+                if immersion == .on { Task { try? await Task.sleep(for: .seconds(1)); if desktop.immersion == .on { dismissWindow(id: "home") } } }
+            }
             .task {
                 #if targetEnvironment(simulator)
                 SimulatorScript.run(connection, desktop, connect: { connection.pair.map(connect) }, disconnect: desktop.disconnect)
@@ -79,14 +82,7 @@ struct HomeView: View {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
         case (_, _?) where desktop.immersion != .off:
-            switch desktop.game {
-            case .running(let name): Text("Playing \(name)").foregroundStyle(.secondary)
-            case .stopped(let name): Text("\(name) stopped").foregroundStyle(.secondary)
-            case .none: EmptyView()
-            }
-            Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
             Button("Windowed") { desktop.leaveImmersive() }
-            Button("Hide") { dismissWindow(id: "home") }
         case (_, let pair?):
             Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)

@@ -84,24 +84,46 @@ struct ImmersiveContent: View {
     let connection: Connection
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
+    @State private var hudShown = false
 
     var body: some View {
-        RealityView { content in
+        RealityView { content, attachments in
             var material = UnlitMaterial(color: .clear)
             material.blending = .transparent(opacity: .init(floatLiteral: 0))
             let shell = ModelEntity(mesh: .generateSphere(radius: 3), materials: [material])
             shell.name = "shell"
             shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
             content.add(shell)
-        } update: { content in
-            guard let shell = content.entities.first(where: { $0.name == "shell" }) else { return }
-            if connection.homeWindows == 0 { shell.components.set(InputTargetComponent()) } else { shell.components.remove(InputTargetComponent.self) }
+            let head = AnchorEntity(.head)
+            if let hud = attachments.entity(for: "hud") {
+                hud.position = [0, -0.32, -0.75]
+                head.addChild(hud)
+            }
+            content.add(head)
+        } update: { content, attachments in
+            if let shell = content.entities.first(where: { $0.name == "shell" }) {
+                if hudShown { shell.components.remove(InputTargetComponent.self) } else { shell.components.set(InputTargetComponent()) }
+            }
+            attachments.entity(for: "hud")?.isEnabled = hudShown
+        } attachments: {
+            Attachment(id: "hud") {
+                VStack(spacing: 12) {
+                    Text(status).font(.headline)
+                    HStack(spacing: 12) {
+                        Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
+                        Button("Windowed") { desktop.leaveImmersive() }
+                        Button("Hide") { hudShown = false }
+                    }
+                }
+                .controlSize(.large)
+                .padding(20)
+                .glassBackgroundEffect()
+            }
         }
-        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in if connection.homeWindows == 0 { openWindow(id: "home") } })
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in hudShown = true })
         .onAppear {
             #if targetEnvironment(simulator)
-            SimulatorScript.actions["door"] = { if connection.homeWindows > 0 { dismissWindow(id: "home") } else { openWindow(id: "home") } }
+            SimulatorScript.actions["door"] = { hudShown.toggle() }
             #endif
         }
         .onDisappear {
@@ -111,4 +133,11 @@ struct ImmersiveContent: View {
         }
     }
 
+    private var status: String {
+        switch desktop.game {
+        case .running(let name): "Playing \(name)"
+        case .stopped(let name): "\(name) stopped"
+        case .none: "Fullscreen on \(connection.pair?.hostName ?? "PC")"
+        }
+    }
 }
