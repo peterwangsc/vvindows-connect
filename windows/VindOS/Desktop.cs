@@ -120,7 +120,7 @@ sealed class Desktop : IDisposable
             _announced = true;
             vindos_desktop_idr();
             Log.Write($"desktop stream sent {w}x{h}");
-            StatusChanged?.Invoke("Vision Pro is viewing this desktop.");
+            StatusChanged?.Invoke("Vision Pro is viewing this desktop. Fullscreen on Vision Pro puts it on the big screen.");
             long sent = 0;
             var lastReport = Environment.TickCount64;
             vindos_desktop_rect(out var left, out var top, out var right, out var bottom);
