@@ -1,7 +1,7 @@
 <Window x:Class="VindOS.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="vindOS" Width="580" Height="680" MinWidth="480" MinHeight="600" WindowStartupLocation="CenterScreen"
+        Title="vindOS" Icon="vindOS.ico" Width="580" Height="680" MinWidth="480" MinHeight="600" WindowStartupLocation="CenterScreen"
         Background="#F7F8FB" FontFamily="Segoe UI" FontSize="15" Foreground="#17213A">
     <Window.Resources>
         <Style x:Key="Primary" TargetType="Button">
@@ -87,6 +87,7 @@
             <DockPanel>
                 <Button Content="Settings" Style="{StaticResource Link}" Click="Settings_Click" DockPanel.Dock="Right" />
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="vindOS.png" Width="28" Height="28" Margin="0,0,10,0" VerticalAlignment="Center" />
                     <TextBlock Text="vindOS" FontSize="23" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock x:Name="VersionText" FontSize="13" Foreground="#5B6478" VerticalAlignment="Bottom" Margin="8,0,0,4" />
                 </StackPanel>
