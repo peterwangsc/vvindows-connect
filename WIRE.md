@@ -117,14 +117,3 @@ stream. No new connection, port or trust.
 | `recenter` | headset → host | | while a game runs: the host sends the game's recenter chord to its window (Assetto Corsa: Ctrl+Space); no reply |
 
 `windowed` while a game runs kills the game first, then returns as usual.
-
-## Latency
-
-| `type` | direction | fields | meaning |
-| --- | --- | --- | --- |
-| `clock` | headset → host | `t1` headset monotonic µs | sent every 2 s while streaming |
-| `clock` | host → headset | `t1` echoed, `t2` host µs on the VIDEO `captureTimestampUs` clock | the headset takes `t3` on receipt: `rtt = t3 − t1`, `offset = t2 − (t1 + t3) / 2`, keeps the last 15 and uses the offset from the smallest rtt |
-| `latency` | headset → host | `p50`, `p95` ms, `rtt` ms, `frames`, `dropped` | every 5 s: capture → enqueue on the joined clock; decode and display are not included |
-
-Headset "present" is the hand-off to the renderer, not the photon time; decode
-plus at most one panel frame is a bound on the remainder, unmeasured.

@@ -18,11 +18,6 @@ final class Desktop {
     private(set) var state = State.idle
     private(set) var immersion = Immersion.off
     private(set) var games: [Game] = []
-    private(set) var latency = ""
-    private var clock: [(rtt: Int64, offset: Int64)] = []
-    private var samples: [Int64] = []
-    private var dropped = 0
-    private var ticker: Task<Void, Never>?
     private(set) var game = GameState.none
     private var hostAddress: (any IPAddress)?
     var desktopWindows = 0
@@ -92,9 +87,6 @@ final class Desktop {
     }
 
     func disconnect() {
-        ticker?.cancel()
-        clock.removeAll()
-        latency = ""
         if immersion != .off { leaveImmersive() }
         browser?.cancel()
         browser = nil
@@ -155,56 +147,15 @@ final class Desktop {
         }
     }
 
-    private static var now: Int64 { Int64(DispatchTime.now().uptimeNanoseconds / 1000) }
-
-    private func startTicker() {
-        ticker?.cancel()
-        ticker = Task {
-            var tick = 0
-            while !Task.isCancelled {
-                if immersion == .off {
-                    connection?.send(content: Frame.control(["v": 1, "type": "clock", "t1": Self.now]), completion: .idempotent)
-                    tick += 1
-                    if tick % 3 == 0 { report() }
-                }
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
-    }
-
-    private func report() {
-        guard let best = clock.min(by: { $0.rtt < $1.rtt }) else { return }
-        let sorted = samples.sorted()
-        let p50 = sorted.isEmpty ? 0 : Double(sorted[sorted.count / 2]) / 1000
-        let p95 = sorted.isEmpty ? 0 : Double(sorted[min(sorted.count - 1, sorted.count * 95 / 100)]) / 1000
-        latency = String(format: "%.0f/%.0f ms rtt %.1f", p50, p95, Double(best.rtt) / 1000)
-        connection?.send(content: Frame.control(["v": 1, "type": "latency", "p50": p50, "p95": p95, "rtt": Double(best.rtt) / 1000, "frames": samples.count, "dropped": dropped]), completion: .idempotent)
-        samples.removeAll()
-        dropped = 0
-    }
-
     private func handle(type: UInt8, _ body: Data) {
         switch type {
         case 0:
             guard body.count > 9 else { return }
-            let captured = Int64(bitPattern: body.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }.littleEndian)
-            let flags = body[body.startIndex + 8]
-            let enqueued = video.enqueue(annexB: body.dropFirst(9), keyframe: flags & 1 == 1)
-            if !enqueued { dropped += 1 } else if immersion == .off, flags & 2 == 0, let best = clock.min(by: { $0.rtt < $1.rtt }) {
-                let sample = Self.now - (captured + best.offset)
-                if (0...5_000_000).contains(sample) { samples.append(sample) }
-            }
+            video.enqueue(annexB: body.dropFirst(9), keyframe: body[body.startIndex + 8] & 1 == 1)
         case 1:
             guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any], let kind = json["type"] as? String else { return }
             switch kind {
-            case "stream":
-                state = .streaming(width: json["width"] as? Int ?? 0, height: json["height"] as? Int ?? 0)
-                startTicker()
-            case "clock":
-                guard let t1 = json["t1"] as? Int64, let t2 = json["t2"] as? Int64 else { return }
-                let t3 = Self.now
-                clock.append((rtt: t3 - t1, offset: t2 - (t1 + t3) / 2))
-                if clock.count > 15 { clock.removeFirst() }
+            case "stream": state = .streaming(width: json["width"] as? Int ?? 0, height: json["height"] as? Int ?? 0)
             case "immersive":
                 guard immersion == .starting, let host = hostAddress, let port = (json["port"] as? Int).flatMap({ NWEndpoint.Port(rawValue: UInt16($0)) }) else { return leaveImmersive() }
                 immersion = .on
@@ -228,7 +179,6 @@ final class Desktop {
     }
 
     private func fail(_ reason: String) {
-        ticker?.cancel()
         connection?.cancel()
         connection = nil
         video.reset()

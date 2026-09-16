@@ -73,7 +73,6 @@ struct DesktopView: View {
                     default: ProgressView()
                     }
                 }
-                Text(desktop.latency)
                     .font(.caption.monospaced())
             }
             .padding(8)
