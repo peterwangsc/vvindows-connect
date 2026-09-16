@@ -40,6 +40,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="xr.cpp" />
+    <ClCompile Include="desktop.cpp" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="OpenXR.Loader" Version="1.0.6.2" />

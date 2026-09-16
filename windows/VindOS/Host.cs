@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text.Json;
 using QRCoder;
 
@@ -7,16 +8,17 @@ namespace VindOS;
 
 sealed class Host : IDisposable
 {
-    sealed record Session(string Id, string ClientId, string Token, string Fingerprint, bool Reconnect);
+    sealed record Session(string Id, string ClientId, string Token, string Fingerprint, string DesktopToken, bool Reconnect);
 
     public event Action<string>? StatusChanged;
     public event Action<byte[]?>? QrChanged;
     public event Action<Pair?>? PairChanged;
 
-    readonly string _serverId = PairStore.ServerId();
+    readonly HostIdentity _identity;
     readonly TcpListener _listener = new(IPAddress.Any, 0);
     readonly Bonjour _bonjour;
-    readonly StreamManager _manager = new();
+    readonly StreamManager _manager;
+    readonly Desktop _desktop;
     readonly CancellationTokenSource _cts = new();
     NetworkStream? _stream;
     Session? _session;
@@ -31,9 +33,13 @@ sealed class Host : IDisposable
         using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
             if (new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
                 throw new InvalidOperationException("Run vindOS without administrator rights. The OpenXR loader ignores the app's runtime selection when elevated.");
+        _identity = PairStore.Identity();
+        _manager = new StreamManager();
+        _desktop = new Desktop(_identity.DesktopPfx, _identity.DesktopPort, () => Pair?.TokenHash);
+        _desktop.StatusChanged += s => { if (s is null) Idle(); else StatusChanged?.Invoke(s); };
         _listener.Start();
-        _bonjour = new Bonjour((ushort)((IPEndPoint)_listener.LocalEndpoint).Port);
-        Log.Write($"listening {_listener.LocalEndpoint} as {HostName}");
+        _bonjour = new Bonjour((ushort)((IPEndPoint)_listener.LocalEndpoint).Port, _identity.ServerId, _identity.DesktopPort);
+        Log.Write($"listening {_listener.LocalEndpoint} as {HostName}, desktop port {_identity.DesktopPort}");
         _ = ListenAsync();
         Idle();
     }
@@ -56,6 +62,7 @@ sealed class Host : IDisposable
         PairStore.Forget();
         Pair = null;
         PairChanged?.Invoke(null);
+        _desktop.Disconnect();
         _ = DisconnectAsync();
         Idle();
     }
@@ -104,8 +111,8 @@ sealed class Host : IDisposable
                 if (root.GetProperty("ProtocolVersion").GetString() != "1" || !(reconnect || _armed)) { await SendAsync(Wire.RequestSessionDisconnect(sessionId)); return; }
                 var token = _manager.ClientToken(clientId);
                 var fingerprint = _manager.Fingerprint();
-                _session = new Session(sessionId, clientId, token, fingerprint, reconnect);
-                await SendAsync(Wire.AcknowledgeConnection(sessionId, _serverId, reconnect ? fingerprint : null));
+                _session = new Session(sessionId, clientId, token, fingerprint, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)), reconnect);
+                await SendAsync(Wire.AcknowledgeConnection(sessionId, _identity.ServerId, reconnect ? fingerprint : null));
                 break;
             case "RequestBarcodePresentation":
                 await SendAsync(Wire.AcknowledgeBarcodePresentation(sessionId));
@@ -122,7 +129,8 @@ sealed class Host : IDisposable
                 {
                     if (!_session!.Reconnect)
                     {
-                        PairStore.SavePair(Pair = new Pair(_session.ClientId, _serverId, _session.Fingerprint, DateTimeOffset.Now));
+                        var hash = Convert.ToHexStringLower(SHA256.HashData(Convert.FromHexString(_session.DesktopToken)));
+                        PairStore.SavePair(Pair = new Pair(_session.ClientId, _identity.ServerId, _session.Fingerprint, hash, DateTimeOffset.Now));
                         _armed = false;
                         PairChanged?.Invoke(Pair);
                     }
@@ -138,14 +146,14 @@ sealed class Host : IDisposable
         StatusChanged?.Invoke("Starting session…");
         await _manager.StartServiceAsync(_cts.Token);
         var ready = new TaskCompletionSource();
-        _xr = new XrSession(Wire.Paired(_serverId, HostName), (kind, value) =>
+        _xr = new XrSession(Wire.Paired(_identity.ServerId, HostName, _desktop.Fingerprint, _session!.DesktopToken), (kind, value) =>
         {
             Log.Write($"xr {kind} {value}");
             if (kind == XrSession.Kind.Stage && value == 7) ready.TrySetResult();
             if (kind == XrSession.Kind.Sent) StatusChanged?.Invoke("Paired. Vision Pro is saving the connection.");
         });
         await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(5), _cts.Token));
-        if (_session is not null) await SendAsync(Wire.MediaStreamIsReady(_session.Id));
+        if (_session is not null) { await SendAsync(Wire.MediaStreamIsReady(_session.Id)); Log.Write("sent MediaStreamIsReady"); }
     }
 
     async Task EndSessionAsync()
@@ -177,6 +185,7 @@ sealed class Host : IDisposable
         _xr?.Dispose();
         _listener.Stop();
         _bonjour.Dispose();
+        _desktop.Dispose();
         _manager.Dispose();
     }
 }

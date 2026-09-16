@@ -43,6 +43,7 @@ static class Wire
     public static object AcknowledgeBarcodePresentation(string sessionId) => new { Event = "AcknowledgeBarcodePresentation", SessionID = sessionId };
     public static object MediaStreamIsReady(string sessionId) => new { Event = "MediaStreamIsReady", SessionID = sessionId };
     public static object RequestSessionDisconnect(string sessionId) => new { Event = "RequestSessionDisconnect", SessionID = sessionId };
-    public static string Paired(string serverId, string hostName) => JsonSerializer.Serialize(new { v = 1, type = "paired", serverId, hostName });
+    public static string Paired(string serverId, string hostName, string sha256, string token) =>
+        JsonSerializer.Serialize(new { v = 2, type = "paired", serverId, hostName, desktop = new { sha256, token } });
     public static string Barcode(string token, string digest) => JsonSerializer.Serialize(new { token, digest });
 }
