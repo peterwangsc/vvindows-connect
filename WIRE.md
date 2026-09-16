@@ -114,4 +114,6 @@ stream. No new connection, port or trust.
 | `game` | headset → host | `id` | start this game; only while immersive |
 | `game` | host → headset | `id`, `running`, optional `reason` | `running: true` once the process is up; `running: false` when it exits or fails, after which the host's quad session is back |
 
+| `recenter` | headset → host | | while a game runs: the host sends the game's recenter chord to its window (Assetto Corsa: Ctrl+Space); no reply |
+
 `windowed` while a game runs kills the game first, then returns as usual.

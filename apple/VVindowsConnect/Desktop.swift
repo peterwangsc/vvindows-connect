@@ -46,6 +46,11 @@ final class Desktop {
         connection?.send(content: Frame.control(["v": 1, "type": "game", "id": game.id]), completion: .idempotent)
     }
 
+    func recenter() {
+        guard case .running = game else { return }
+        connection?.send(content: Frame.control(["v": 1, "type": "recenter"]), completion: .idempotent)
+    }
+
     func leaveImmersive() {
         guard immersion != .off else { return }
         immersion = .off

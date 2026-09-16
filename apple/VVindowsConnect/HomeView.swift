@@ -82,6 +82,7 @@ struct HomeView: View {
             case .starting(let game): ProgressView("Starting \(game.name)…")
             case .running(let game):
                 Text("Playing \(game.name)").foregroundStyle(.secondary)
+                Button("Recenter") { desktop.recenter() }
                 KeyboardView { desktop.send($0) }
                     .frame(height: 60)
                     .overlay { Text("Tap here, then type to drive").foregroundStyle(.secondary).allowsHitTesting(false) }
