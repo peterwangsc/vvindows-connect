@@ -80,14 +80,13 @@ struct HomeView: View {
         case (_, _?) where desktop.immersion != .off:
             switch desktop.game {
             case .starting(let game): ProgressView("Starting \(game.name)…")
-            case .running(let game):
-                Text("Playing \(game.name)").foregroundStyle(.secondary)
-                Button("Recenter") { desktop.recenter() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.extraLarge)
+            case .running(let game): Text("Playing \(game.name)").foregroundStyle(.secondary)
             case .failed(let reason): Text(reason).foregroundStyle(.secondary)
             case .none: EmptyView()
             }
+            Button("Recenter") { desktop.recenter() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.extraLarge)
             if case .running = desktop.game {} else if case .starting = desktop.game {} else {
                 ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) } }
             }
