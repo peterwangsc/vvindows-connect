@@ -23,6 +23,7 @@ sealed class Host : IDisposable
     NetworkStream? _stream;
     Session? _session;
     XrSession? _xr;
+    Game? _game;
     bool _armed, _immersive;
     readonly SemaphoreSlim _lifecycle = new(1, 1);
 
@@ -40,6 +41,8 @@ sealed class Host : IDisposable
         _desktop.StatusChanged += s => { if (s is null) Idle(); else StatusChanged?.Invoke(s); };
         _desktop.ImmersiveRequested = BeginImmersiveAsync;
         _desktop.DesktopRequested = EndImmersiveAsync;
+        _desktop.GameRequested = StartGameAsync;
+        Log.Write($"games installed: {string.Join(",", Game.Installed().Select(g => g.Id))}");
         _listener.Start();
         _desktop.ApplePort = ((IPEndPoint)_listener.LocalEndpoint).Port;
         _bonjour = new Bonjour((ushort)_desktop.ApplePort, _identity.ServerId, _identity.DesktopPort);
@@ -193,6 +196,55 @@ sealed class Host : IDisposable
         finally { _lifecycle.Release(); }
     }
 
+    async Task<string?> StartGameAsync(string id)
+    {
+        var entry = Game.Registry.FirstOrDefault(g => g.Id == id);
+        if (entry is null) return "unknown game";
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
+        {
+            if (!_immersive) return "not in immersive mode";
+            if (_game is not null) return _game.Running ? $"{_game.Entry.Name} is already running" : "previous game still closing";
+            _xr?.Dispose();
+            _xr = null;
+            try { _game = new Game(entry); }
+            catch (Exception e)
+            {
+                Log.Write($"game {id} start failed {e.Message}");
+                var error = await StartXrAsync(null, true);
+                if (error is not null) Log.Write($"quad restart failed {error}");
+                return e.Message;
+            }
+            var game = _game;
+            game.Exited += code => _ = OnGameExitedAsync(game, code);
+            StatusChanged?.Invoke($"{entry.Name} is running in Immersive Mode.");
+            _ = Task.Delay(TimeSpan.FromSeconds(8), _cts.Token).ContinueWith(_ => Log.Write($"foreground after game start: {Game.Foreground()}"), TaskContinuationOptions.OnlyOnRanToCompletion);
+            return null;
+        }
+        finally { _lifecycle.Release(); }
+    }
+
+    async Task OnGameExitedAsync(Game game, int code)
+    {
+        await _lifecycle.WaitAsync(_cts.Token);
+        var restore = false;
+        try
+        {
+            if (!ReferenceEquals(_game, game)) return;
+            _game = null;
+            game.Dispose();
+            restore = _immersive;
+            if (restore)
+            {
+                var error = await StartXrAsync(null, true);
+                if (error is not null) Log.Write($"quad restart failed {error}");
+                StatusChanged?.Invoke("Vision Pro is in Immersive Mode.");
+            }
+        }
+        finally { _lifecycle.Release(); }
+        if (restore) await _desktop.GameEndedAsync(game.Entry.Id, $"exited with code {code}");
+    }
+
     async Task EndImmersiveAsync()
     {
         await _lifecycle.WaitAsync(_cts.Token);
@@ -226,6 +278,7 @@ sealed class Host : IDisposable
     void TearDown()
     {
         _session = null;
+        if (_game is not null) { var game = _game; _game = null; game.Dispose(); }
         _xr?.Dispose();
         _xr = null;
         _ = Task.Run(_manager.StopService);

@@ -26,6 +26,16 @@ sealed class Desktop : IDisposable
     public event Action<string>? StatusChanged;
     public Func<Task<string?>>? ImmersiveRequested;
     public Func<Task>? DesktopRequested;
+    public Func<string, Task<string?>>? GameRequested;
+
+    public async Task GameEndedAsync(string id, string reason)
+    {
+        SslStream? stream;
+        lock (_gate) stream = _stream;
+        if (stream is null || !_immersive) return;
+        try { await WriteAsync(stream, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = false, reason })); }
+        catch (Exception e) { Log.Write($"game end send failed {e.Message}"); }
+    }
 
     readonly X509Certificate2 _certificate;
     readonly TcpListener _listener;
@@ -110,6 +120,7 @@ sealed class Desktop : IDisposable
             var (w, h) = await size.Task.WaitAsync(TimeSpan.FromSeconds(5), _cts.Token);
             await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "stream", width = w, height = h, fps = Fps }));
             Log.Write($"desktop stream sent {w}x{h}");
+            await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "games", games = Game.Installed().Select(g => new { id = g.Id, name = g.Name }).ToArray() }));
             StatusChanged?.Invoke("Vision Pro is viewing this desktop.");
             long sent = 0;
             var lastReport = Environment.TickCount64;
@@ -140,6 +151,12 @@ sealed class Desktop : IDisposable
                             case "windowed":
                                 if (DesktopRequested is not null) await DesktopRequested();
                                 await EndImmersiveAsync();
+                                break;
+                            case "game":
+                                var id = doc.RootElement.GetProperty("id").GetString() ?? "";
+                                var failure = !_immersive ? "not in immersive mode" : GameRequested is null ? "unsupported" : await GameRequested(id);
+                                if (failure is not null) Log.Write($"game {id} refused: {failure}");
+                                await WriteAsync(ssl, 1, failure is null ? JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = true }) : JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = false, reason = failure }));
                                 break;
                         }
                     }
