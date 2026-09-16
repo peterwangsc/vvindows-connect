@@ -7,6 +7,7 @@
 #include <codecapi.h>
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -25,9 +26,10 @@ static std::atomic<bool> d_quit{ false }, d_idr{ false };
 static std::thread d_thread;
 static std::mutex d_lifecycle;
 static RECT d_rect{};
+static std::atomic<int64_t> d_epoch{ 0 }; static int64_t d_freq = 0;
 
 struct Grabber final : IMFSampleGrabberSinkCallback {
-	std::atomic<ULONG> refs{ 1 }; FrameFn cb; std::vector<uint8_t> out, sps, pps;
+	std::atomic<ULONG> refs{ 1 }; FrameFn cb; std::vector<uint8_t> out, sps, pps; std::mutex flagLock; std::deque<bool> repeats;
 	explicit Grabber(FrameFn f) : cb(f) {}
 	HRESULT STDMETHODCALLTYPE QueryInterface(REFIID id, void** r) override {
 		if (!r) return E_POINTER;
@@ -61,7 +63,8 @@ struct Grabber final : IMFSampleGrabberSinkCallback {
 		if (idr && !hasSps && !sps.empty()) put(sps.data(), sps.size());
 		if (idr && !hasPps && !pps.empty()) put(pps.data(), pps.size());
 		for (auto& n : nals) put(n.first, n.second);
-		if (!out.empty() && out.size() <= 16u << 20) cb(time / 10, idr ? 1 : 0, out.data(), (int32_t)out.size());
+		bool repeat = false; { std::lock_guard<std::mutex> lock(flagLock); if (!repeats.empty()) { repeat = repeats.front(); repeats.pop_front(); } }
+		if (!out.empty() && out.size() <= 16u << 20) cb(time / 10, (idr ? 1 : 0) | (repeat ? 2 : 0), out.data(), (int32_t)out.size());
 		return S_OK;
 	}
 };
@@ -114,7 +117,8 @@ static void run(uint32_t fps, uint32_t bitrate, FrameFn frame, DesktopEventFn ev
 		ComPtr<IMFSample> sample; ccheck(MFCreateSample(&sample), 7); ccheck(sample->AddBuffer(buffer.Get()), 7);
 		HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
 		LARGE_INTEGER freq, now; QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&now);
-		const int64_t period = freq.QuadPart / fps, epoch = now.QuadPart; int64_t next = now.QuadPart, lastSubmit = 0;
+		if (!d_freq) { d_freq = freq.QuadPart; d_epoch = now.QuadPart; }
+		const int64_t period = freq.QuadPart / fps, epoch = d_epoch.load(); int64_t next = now.QuadPart, lastSubmit = 0;
 		ev(2, 1);
 		while (!d_quit) {
 			QueryPerformanceCounter(&now);
@@ -132,6 +136,7 @@ static void run(uint32_t fps, uint32_t bitrate, FrameFn frame, DesktopEventFn ev
 			if (d_idr.exchange(false)) set(CODECAPI_AVEncVideoForceKeyFrame, 1, false);
 			QueryPerformanceCounter(&now); lastSubmit = now.QuadPart;
 			sample->SetSampleTime((now.QuadPart - epoch) * 10000000 / freq.QuadPart); sample->SetSampleDuration(10000000 / fps);
+			{ std::lock_guard<std::mutex> lock(grabber->flagLock); grabber->repeats.push_back(!fresh); }
 			ccheck(writer->WriteSample(stream, sample.Get()), 11);
 		}
 		CloseHandle(timer);

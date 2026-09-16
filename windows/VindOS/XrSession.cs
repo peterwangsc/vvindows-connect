@@ -11,6 +11,7 @@ sealed class XrSession : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate void EventFn(int kind, int value);
     [DllImport("VindOS.Xr.dll", CharSet = CharSet.Unicode)] static extern int vindos_xr_start(string runtimeJson, [MarshalAs(UnmanagedType.LPUTF8Str)] string? paired, float quadWidth, float quadDistance, EventFn onEvent);
     [DllImport("VindOS.Xr.dll")] static extern void vindos_xr_stop();
+    [DllImport("VindOS.Xr.dll")] static extern void vindos_xr_recenter();
 
     readonly EventFn _callback;
 
@@ -21,6 +22,8 @@ sealed class XrSession : IDisposable
         _callback = (k, v) => onEvent((Kind)k, v);
         if (vindos_xr_start(StreamManager.RuntimeJson, pairedJson, desktopQuad ? QuadWidth : 0, QuadDistance, _callback) != 0) throw new InvalidOperationException("An OpenXR session is already running.");
     }
+
+    public void Recenter() => vindos_xr_recenter();
 
     int _disposed;
 
