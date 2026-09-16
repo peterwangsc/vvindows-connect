@@ -73,7 +73,6 @@ struct DesktopView: View {
                     default: ProgressView()
                     }
                 }
-                    .font(.caption.monospaced())
             }
             .padding(8)
             .glassBackgroundEffect()
