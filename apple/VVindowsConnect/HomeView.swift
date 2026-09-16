@@ -80,7 +80,12 @@ struct HomeView: View {
         case (_, _?) where desktop.immersion != .off:
             switch desktop.game {
             case .starting(let game): ProgressView("Starting \(game.name)…")
-            case .running(let game): Text("Playing \(game.name)").foregroundStyle(.secondary)
+            case .running(let game):
+                Text("Playing \(game.name)").foregroundStyle(.secondary)
+                KeyboardView { desktop.send($0) }
+                    .frame(height: 60)
+                    .overlay { Text("Tap here, then type to drive").foregroundStyle(.secondary).allowsHitTesting(false) }
+                    .glassBackgroundEffect()
             case .failed(let reason): Text(reason).foregroundStyle(.secondary)
             case .none: EmptyView()
             }
