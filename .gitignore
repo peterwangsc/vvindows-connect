@@ -18,3 +18,7 @@ obj/
 *.p12
 *.key
 *.pem
+windows/vendor/
+windows/VindOS/native/
+windows/VindOS.Xr/obj/
+windows/tmp/
