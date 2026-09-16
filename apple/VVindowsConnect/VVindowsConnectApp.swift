@@ -20,7 +20,9 @@ struct VVindowsConnectApp: App {
         WindowGroup(id: "desktop") { DesktopView(desktop: desktop) }
             .defaultSize(width: 1600, height: 900)
             .windowResizability(.contentSize)
-        #if !targetEnvironment(simulator)
+        #if targetEnvironment(simulator)
+        ImmersiveSpace(id: "immersive") { ImmersiveExit(desktop: desktop) }
+        #else
         ImmersiveSpace(foveatedStreaming: connection.session) { ImmersiveExit(desktop: desktop) }
             .immersionStyle(selection: .constant(.progressive(0.1...1, initialAmount: 1)), in: .progressive(0.1...1, initialAmount: 1))
         #endif

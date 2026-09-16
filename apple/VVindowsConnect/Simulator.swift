@@ -7,14 +7,17 @@ import SwiftUI
 @MainActor @Observable
 final class FoveatedStreamingSession {
     struct Endpoint {
+        var local = false
         static let systemDiscovered = Endpoint()
-        static func local(ipAddress: any IPAddress, port: NWEndpoint.Port) -> Endpoint { Endpoint() }
+        static func local(ipAddress: any IPAddress, port: NWEndpoint.Port) -> Endpoint { Endpoint(local: true) }
     }
     struct ImmersivePresentationBehaviors: ExpressibleByArrayLiteral {
-        init(arrayLiteral: ImmersivePresentationBehaviors...) {}
+        var open: OpenImmersiveSpaceAction?
+        var dismiss: DismissImmersiveSpaceAction?
+        init(arrayLiteral: ImmersivePresentationBehaviors...) { arrayLiteral.forEach { open = open ?? $0.open; dismiss = dismiss ?? $0.dismiss } }
         init() {}
-        static func presentOnConnect(_ open: OpenImmersiveSpaceAction) -> Self { .init() }
-        static func dismissOnDisconnect(_ dismiss: DismissImmersiveSpaceAction) -> Self { .init() }
+        static func presentOnConnect(_ open: OpenImmersiveSpaceAction) -> Self { var b = Self(); b.open = open; return b }
+        static func dismissOnDisconnect(_ dismiss: DismissImmersiveSpaceAction) -> Self { var b = Self(); b.dismiss = dismiss; return b }
     }
     var immersivePresentationBehaviors = ImmersivePresentationBehaviors()
     struct DisconnectReason: Error, Equatable { static let unavailable = DisconnectReason() }
@@ -34,6 +37,11 @@ final class FoveatedStreamingSession {
     func connect(endpoint: Endpoint) async throws {
         status = .connecting
         try await Task.sleep(for: .seconds(1))
+        if endpoint.local {
+            status = .connected
+            await immersivePresentationBehaviors.open?(id: "immersive")
+            return
+        }
         guard let json = ProcessInfo.processInfo.environment["VINDOS_SIM_PAIRED"] else {
             status = .disconnected(.unavailable)
             throw DisconnectReason.unavailable
@@ -46,9 +54,11 @@ final class FoveatedStreamingSession {
     func messageChannel(for id: MessageChannel.ID) -> MessageChannel? { channel?.id == id ? channel : nil }
 
     func disconnect() async {
+        let wasConnected = status == .connected
         status = .disconnected(.unavailable)
         availableMessageChannels = []
         channel = nil
+        if wasConnected { await immersivePresentationBehaviors.dismiss?() }
     }
 }
 #endif
@@ -57,6 +67,8 @@ final class FoveatedStreamingSession {
 @MainActor
 enum SimulatorScript {
     private static var ran = false
+
+    static var actions: [String: () -> Void] = [:]
 
     static func run(_ connection: Connection, _ desktop: Desktop, connect: @escaping () -> Void, disconnect: @escaping () -> Void) {
         guard !ran, let script = ProcessInfo.processInfo.environment["VINDOS_SIM_ACTIONS"] else { return }
@@ -68,7 +80,8 @@ enum SimulatorScript {
                 case "forget": connection.forget()
                 case "connect": connect()
                 case "disconnect": disconnect()
-                default: try? await Task.sleep(for: .seconds(Double(step) ?? 1))
+                case "windowed": desktop.leaveImmersive()
+                default: if let action = actions[String(step)] { action() } else { try? await Task.sleep(for: .seconds(Double(step) ?? 1)) }
                 }
             }
         }

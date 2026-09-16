@@ -28,6 +28,11 @@ struct DesktopView: View {
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .onAppear {
+            #if targetEnvironment(simulator)
+            SimulatorScript.actions["fullscreen"] = { desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
+            SimulatorScript.actions["crown"] = { Task { await dismissImmersiveSpace() } }
+            SimulatorScript.actions["closedesktop"] = { dismissWindow(id: "desktop") }
+            #endif
             desktop.reopening = false
             if desktop.state == .idle { return toHome() }
             desktop.windowOpen = true
@@ -67,7 +72,7 @@ struct DesktopView: View {
                     default: ProgressView()
                     }
                 }
-                Text("\(String(describing: desktop.session.status)) \(String(describing: desktop.immersion)) " + desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
+                Text(desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
                     .font(.caption.monospaced())
             }
             .padding(8)
