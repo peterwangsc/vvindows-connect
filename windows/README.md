@@ -184,3 +184,29 @@ session attached, the headset client stayed connected throughout.
   publisher" prompt; a certificate is Peter's purchase.
 - Not in v0: tray icon, autostart, installer. Uninstall must restore the
   original `openvr_api.dll` files (`Bridge.Remove`) before removing the app.
+
+## Installer
+
+`installeruild.cmd [path	o\ISCC.exe]` builds the native module, publishes
+vindOS self-contained for win-x64 (no .NET install needed) and compiles
+`installerindOS.iss` with Inno Setup 6 into `installer\outindOS-<version>-setup.exe`.
+The installer is per-user (`%LOCALAPPDATA%\ProgramsindOS`, no elevation, so
+the app never runs elevated and input injection keeps working), closes a running
+vindOS, and offers to start it. Uninstall first runs `vindOS.exe --restore-bridges`,
+which puts every game's original `openvr_api.dll` back, then removes the app and
+the unpacked CloudXR files.
+
+The installer ships no NVIDIA files (`vendor\Server` is excluded from publish).
+On first start the window shows the setup card: download CloudXR Runtime 6.2.3
+and Stream Manager 6.1.0 from NGC, drop both ZIPs into
+`%LOCALAPPDATA%indOS\CloudXR`, click Check again; `CloudXr.Import` recognises
+each archive by content and unpacks `Server\`, `NvStreamManagerClient.dll` and
+`releases.2.3\`. The Stream Manager client DLL is loaded from that folder
+through a `DllImportResolver`. A development checkout that has `vendor\Server`
+next to the exe is used when the user folder is incomplete.
+
+Verified 2026-09-16: silent install, setup card shown, both ZIPs imported
+(`cloudxr import: Runtime (...), Stream Manager (...); installed=True`), host
+started with `NvStreamManager.exe` running from the user folder, pair intact.
+Unsigned: SmartScreen shows the unknown-publisher prompt until a certificate
+exists.

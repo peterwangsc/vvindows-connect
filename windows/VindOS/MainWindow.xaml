@@ -97,6 +97,19 @@
                 <TextBlock x:Name="Detail" Style="{StaticResource Muted}" TextAlignment="Center" />
                 <Image x:Name="Qr" Width="240" Height="240" Margin="0,24,0,0" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" Visibility="Collapsed" />
             </StackPanel>
+            <Border x:Name="SetupCard" Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,16" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="NVIDIA CloudXR is needed once" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBlock Style="{StaticResource Muted}">
+                        Download <Hyperlink NavigateUri="https://catalog.ngc.nvidia.com/orgs/nvidia/resources/cloudxr-runtime" RequestNavigate="Link_Click">CloudXR Runtime 6.2.3</Hyperlink> and <Hyperlink NavigateUri="https://catalog.ngc.nvidia.com/orgs/nvidia/resources/cloudxr-stream-manager" RequestNavigate="Link_Click">CloudXR Stream Manager 6.1.0</Hyperlink> for Windows from NVIDIA (free account), put both ZIP files in the folder below, then click Check again. vindOS unpacks what it needs.
+                    </TextBlock>
+                    <TextBlock x:Name="SetupText" Style="{StaticResource Muted}" Margin="0,8,0,0" />
+                    <UniformGrid Columns="2" Margin="0,12,0,0">
+                        <Button Content="Open folder" Style="{StaticResource Secondary}" Margin="0,0,6,0" Click="OpenFolder_Click" />
+                        <Button Content="Check again" Style="{StaticResource Secondary}" Margin="6,0,0,0" Click="CheckAgain_Click" />
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
             <Border x:Name="SteamCard" Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,16">
                 <StackPanel>
                     <TextBlock x:Name="SteamTitle" FontWeight="SemiBold" Margin="0,0,0,4" />

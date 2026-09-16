@@ -8,7 +8,10 @@ namespace VindOS;
 sealed class StreamManager : IDisposable
 {
     const string Dll = "NvStreamManagerClient.dll";
-    public const string RuntimeVersion = "6.2.3";
+    public const string RuntimeVersion = CloudXr.RuntimeVersion;
+
+    static StreamManager() => NativeLibrary.SetDllImportResolver(typeof(StreamManager).Assembly, (name, assembly, path) =>
+        name == Dll && File.Exists(Path.Combine(ServerDir, Dll)) ? NativeLibrary.Load(Path.Combine(ServerDir, Dll)) : nint.Zero);
 
     [StructLayout(LayoutKind.Sequential)]
     struct ServiceStatus
@@ -45,7 +48,7 @@ sealed class StreamManager : IDisposable
         public nuint ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
     }
 
-    public static readonly string ServerDir = Path.Combine(AppContext.BaseDirectory, "Server");
+    public static readonly string ServerDir = CloudXr.ServerDir;
     public static readonly string RuntimeJson = Path.Combine(ServerDir, "releases", RuntimeVersion, "openxr_cloudxr.json");
 
     readonly nint _job;
