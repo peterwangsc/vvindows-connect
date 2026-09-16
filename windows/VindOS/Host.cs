@@ -253,11 +253,11 @@ sealed class Host : IDisposable
         await _desktop.GameStartedAsync(id);
         var watch = _watch;
         var started = Environment.TickCount64;
-        foreach (var at in new[] { 5, 20, 40 })
+        while (watch is not null && ReferenceEquals(_watch, watch) && watch.Pid != 0 && _xr is null)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(0, started + at * 1000 - Environment.TickCount64)), _cts.Token);
-            if (watch is null || !ReferenceEquals(_watch, watch) || watch.Pid == 0 || _xr is not null) return;
-            Log.Write($"auto recenter at +{at} s {(watch.Recenter() ? "sent" : "skipped, game not foreground")}");
+            if (watch.Recenter()) { Log.Write($"auto recenter sent {Environment.TickCount64 - started} ms after yield"); return; }
+            if (Environment.TickCount64 - started > 10000) { Log.Write("auto recenter skipped: game never took the foreground within 10 s"); return; }
+            await Task.Delay(100, _cts.Token);
         }
     }
 
