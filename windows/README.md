@@ -21,6 +21,7 @@ No PIN, second approval, device list or Windows-side Connect button.
   - `vendor/NvStreamManagerClient.dll` from Stream Manager 6.1.0 `SampleClient/`
   - `vendor/Server/{NvStreamManager.exe,CloudXrService.exe,cloudxr-runtime.yaml}` from Stream Manager 6.1.0 `Server/`
   - `vendor/Server/releases/6.2.3/` — the contents of CloudXR Runtime 6.2.3 Win64
+  - `vendor/opencomposite/openvr_api.dll` — OpenComposite x64, openxr branch (znix.xyz/OpenComposite), sha256 827ad85f…08242c
 
 ## Build
 
@@ -110,3 +111,27 @@ Verified on hardware 2026-09-16: ten entries, each CONNECTED about 2.4 s after
 Fullscreen with no QR; return in 270 ms with the desktop stream intact; the
 desktop is visible on the quad. CloudXR media is not encrypted by the vendor;
 only its signaling and the desktop stream are.
+
+## Games
+
+`Steam.cs` scans the Steam library at startup and on "Rescan Steam library":
+every `appmanifest_*.acf` across `libraryfolders.vdf`, joined to the binary
+`appcache/appinfo.vdf` (format 0x07564429, string-table keys). A title is a VR
+game when its `common` block carries `openvrsupport` or `openxrsupport`, or a
+launch entry is typed `vr` or `openxr`; the launch entry is the Windows,
+non-32-bit, non-beta one, preferring the VR-typed entry, then the untyped one.
+Assetto Corsa resolves to `AssettoCorsa.exe` (its launcher), which starts
+`acs.exe` inside the same job object. No list is kept on disk; the scan is
+milliseconds.
+
+The vindOS window shows one Play button per VR game. Play while the headset is
+in Immersive Mode ends the desktop quad and launches the game with
+`XR_RUNTIME_JSON` on the CloudXR runtime; OpenVR titles get the OpenComposite
+`openvr_api.dll` from `vendor/opencomposite/` copied over every 64-bit
+`openvr_api.dll` in their install (original kept beside it as
+`*.vindos-original`), and that directory prepended to PATH. Play while windowed
+launches the same executable with no runtime environment, so the game runs flat
+on the desktop. The job object counts live processes; when it reaches zero the
+quad session restarts and the headset gets `game{running:false}`. Stop
+terminates the job. `recenter` from the headset sends Ctrl+Space when the
+foreground window belongs to the job, otherwise re-places the quad.
