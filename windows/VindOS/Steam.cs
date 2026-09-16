@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -9,6 +10,36 @@ sealed record GameEntry(string Id, string Name, string Dir, string Exe, string W
 
 static class Steam
 {
+    public static string Exe => Path.Combine(Root, "steam.exe");
+
+    public static Process? Running() => Process.GetProcessesByName("steam").FirstOrDefault();
+
+    public static string Status()
+    {
+        using var steam = Running();
+        if (steam is null) return "Steam is not running.";
+        var env = ProcessEnv.Read(steam.Id);
+        if (env is null) return "Steam is running; its environment could not be read.";
+        return env.TryGetValue("XR_RUNTIME_JSON", out var json) && string.Equals(json, StreamManager.RuntimeJson, StringComparison.OrdinalIgnoreCase)
+            ? "Steam is running through vindOS. Games you start from Steam use the Vision Pro in Immersive Mode."
+            : "Steam is running without vindOS. Restart it through vindOS so games can use the Vision Pro.";
+    }
+
+    public static async Task RestartAsync(CancellationToken ct)
+    {
+        using (var steam = Running())
+            if (steam is not null)
+            {
+                Process.Start(new ProcessStartInfo(Exe, "-shutdown") { UseShellExecute = false })!.Dispose();
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                while (Running() is { } alive) { alive.Dispose(); if (DateTime.UtcNow > deadline) throw new TimeoutException("Steam did not shut down."); await Task.Delay(500, ct); }
+            }
+        var start = new ProcessStartInfo(Exe) { UseShellExecute = false, WorkingDirectory = Root };
+        start.Environment["XR_RUNTIME_JSON"] = StreamManager.RuntimeJson;
+        Process.Start(start)!.Dispose();
+        Log.Write("steam restarted through vindOS");
+    }
+
     public static string Root => (string?)Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) is { } p ? p.Replace('/', '\\') : @"C:\Program Files (x86)\Steam";
 
     public static List<GameEntry> Scan()
