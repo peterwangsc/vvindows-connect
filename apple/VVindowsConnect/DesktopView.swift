@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DesktopView: View {
     let desktop: Desktop
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         ZStack {
@@ -13,16 +15,24 @@ struct DesktopView: View {
             }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
-        .onAppear { desktop.windowOpen = true }
+        .onAppear {
+            desktop.windowOpen = true
+            if desktop.state == .idle {
+                openWindow(id: "home")
+                dismissWindow()
+            }
+        }
         .onDisappear {
             desktop.windowOpen = false
             desktop.disconnect()
         }
-        .ornament(attachmentAnchor: .scene(.bottom)) {
-            Button("Disconnect", systemImage: "xmark") { desktop.disconnect() }
-                .labelStyle(.iconOnly)
-                .padding(8)
-                .glassBackgroundEffect()
+        .ornament(attachmentAnchor: .scene(.top)) {
+            Button("Disconnect") {
+                desktop.disconnect()
+                dismissWindow()
+            }
+            .padding(8)
+            .glassBackgroundEffect()
         }
     }
 }

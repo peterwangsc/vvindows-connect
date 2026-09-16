@@ -7,7 +7,7 @@ struct VVindowsConnectApp: App {
     @State private var desktop = Desktop()
 
     var body: some Scene {
-        WindowGroup { HomeView(connection: connection, desktop: desktop) }
+        WindowGroup(id: "home") { HomeView(connection: connection, desktop: desktop) }
             .defaultSize(width: 480, height: 320)
         WindowGroup(id: "desktop") { DesktopView(desktop: desktop) }
             .defaultSize(width: 1600, height: 900)
