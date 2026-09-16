@@ -35,7 +35,10 @@ struct DesktopView: View {
         }
         .onDisappear {
             desktop.windowOpen = false
-            if desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                if !desktop.windowOpen, desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
+            }
         }
         .onChange(of: desktop.immersion) { _, immersion in
             if immersion == .on { toHome() }
