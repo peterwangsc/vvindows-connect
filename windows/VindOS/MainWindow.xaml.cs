@@ -22,13 +22,26 @@ public partial class MainWindow : Window
 
     void Start()
     {
+        if (!CloudXr.Installed)
+        {
+            Heading.Text = "One more thing to set up.";
+            Detail.Text = "vindOS streams VR through NVIDIA CloudXR, which NVIDIA provides directly.";
+            SetupText.Text = CloudXr.Dir;
+            SetupCard.Visibility = Visibility.Visible;
+            SteamCard.Visibility = Visibility.Collapsed;
+            PairButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        SetupCard.Visibility = Visibility.Collapsed;
+        SteamCard.Visibility = Visibility.Visible;
+        PairButton.Visibility = Visibility.Visible;
         try
         {
             _host = new Host();
         }
         catch (Exception e)
         {
-            Heading.Text = "vindOS can't start";
+            Heading.Text = "vindOS can't start.";
             Detail.Text = e.Message;
             SteamCard.Visibility = Visibility.Collapsed;
             PairButton.IsEnabled = ForgetButton.IsEnabled = RescanButton.IsEnabled = BridgeButton.IsEnabled = UnbridgeButton.IsEnabled = false;
@@ -133,6 +146,24 @@ public partial class MainWindow : Window
     }
 
     void Forget_Click(object sender, RoutedEventArgs e) => _host!.Forget();
+
+    void OpenFolder_Click(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(CloudXr.Dir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", CloudXr.Dir) { UseShellExecute = true });
+    }
+
+    void CheckAgain_Click(object sender, RoutedEventArgs e)
+    {
+        try { SetupText.Text = CloudXr.Import(); } catch (Exception x) { SetupText.Text = x.Message; return; }
+        if (CloudXr.Installed) Start();
+    }
+
+    void Link_Click(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+        e.Handled = true;
+    }
 
     void Rescan_Click(object sender, RoutedEventArgs e) => _host!.Rescan();
 
