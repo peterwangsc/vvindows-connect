@@ -4,9 +4,9 @@ using System.Text.Json;
 
 namespace VindOS;
 
-sealed record Pair(string ClientId, string ServerId, string Fingerprint, DateTimeOffset PairedAt);
+sealed record Pair(string ClientId, string ServerId, string Fingerprint, string TokenHash, DateTimeOffset PairedAt);
 
-sealed record HostIdentity(string ServerId);
+sealed record HostIdentity(string ServerId, int DesktopPort, byte[] DesktopPfx);
 
 static class PairStore
 {
@@ -19,11 +19,12 @@ static class PairStore
     public static void SavePair(Pair pair) => Save(PairPath, pair);
     public static void Forget() => File.Delete(PairPath);
 
-    public static string ServerId()
+    public static HostIdentity Identity()
     {
         var id = Load<HostIdentity>(IdentityPath);
-        if (id is null) Save(IdentityPath, id = new HostIdentity(Guid.NewGuid().ToString("N")));
-        return id.ServerId;
+        if (id is null || id.DesktopPfx is null || id.DesktopPort == 0)
+            Save(IdentityPath, id = new HostIdentity(id?.ServerId ?? Guid.NewGuid().ToString("N"), RandomNumberGenerator.GetInt32(49152, 65536), Desktop.CreatePfx()));
+        return id;
     }
 
     static T? Load<T>(string path) where T : class

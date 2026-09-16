@@ -25,10 +25,11 @@ sealed class Bonjour : IDisposable
     RegisterRequest _request;
     public string InstanceName { get; }
 
-    public Bonjour(ushort port)
+    public Bonjour(ushort port, string serverId, int desktopPort)
     {
         InstanceName = Environment.MachineName;
-        _instance = DnsServiceConstructInstance($"{InstanceName}.{ServiceType}.local", $"{Environment.MachineName}.local", 0, 0, port, 0, 0, 1, ["Application-Identifier"], [BundleId]);
+        _instance = DnsServiceConstructInstance($"{InstanceName}.{ServiceType}.local", $"{Environment.MachineName}.local", 0, 0, port, 0, 0, 3,
+            ["Application-Identifier", "ServerID", "DesktopPort"], [BundleId, serverId, desktopPort.ToString()]);
         if (_instance == 0) throw new InvalidOperationException("DnsServiceConstructInstance failed.");
         _request = new RegisterRequest { Version = 1, Instance = _instance, Callback = Marshal.GetFunctionPointerForDelegate(Complete) };
         var r = DnsServiceRegister(ref _request, 0);

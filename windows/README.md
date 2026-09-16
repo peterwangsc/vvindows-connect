@@ -54,3 +54,20 @@ bounded session-state and disconnect-code lines and never a token or QR.
    fingerprint so Vision Pro reconnects without a scan.
 5. Forget deletes the record and disconnects; any other ClientID is refused
    until Pair is clicked again.
+
+## Desktop stream (WIRE.md v2)
+
+`Desktop.cs` listens on `DesktopPort`, advertised in the Bonjour TXT record
+next to `ServerID`. Each connection is TLS 1.3 with ALPN `vindos/1` and the
+host's self-signed certificate; the headset pins its SHA-256, which travelled in
+`paired`. The first frame must be `hello` with the desktop token; the host
+compares SHA-256(token) to the pair record in constant time and drops anything
+else. On success it replies `stream`, starts capture, and sends video frames
+(u32 LE length, type 0, u64 LE timestamp in microseconds, flags, Annex B).
+`keyframe` forces an IDR; `bye` or a closed socket stops capture. A later
+authenticated connection replaces the earlier one. Frames queue three deep;
+when the link falls behind, the oldest frame is dropped and an IDR requested.
+
+Measured on this PC (RTX 4070, 1920x1080, animated window, loopback TLS):
+59.0 fps delivered, first frame an IDR with in-band SPS/PPS, wrong token
+refused before any video.
