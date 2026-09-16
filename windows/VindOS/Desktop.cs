@@ -22,21 +22,13 @@ sealed class Desktop : IDisposable
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_idr();
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_stop();
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_rect(out int left, out int top, out int right, out int bottom);
+    [DllImport("VindOS.Xr.dll")] static extern long vindos_desktop_now_us();
 
     public event Action<string>? StatusChanged;
     public Func<Task<string?>>? ImmersiveRequested;
     public Func<Task>? DesktopRequested;
     public Func<string, Task<string?>>? GameRequested;
     public Func<bool>? RecenterRequested;
-
-    public async Task GameEndedAsync(string id, string reason)
-    {
-        SslStream? stream;
-        lock (_gate) stream = _stream;
-        if (stream is null || !_immersive) return;
-        try { await WriteAsync(stream, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = false, reason })); }
-        catch (Exception e) { Log.Write($"game end send failed {e.Message}"); }
-    }
 
     readonly X509Certificate2 _certificate;
     readonly TcpListener _listener;
@@ -46,12 +38,17 @@ sealed class Desktop : IDisposable
     readonly EventFn _onEvent;
     readonly object _gate = new();
     SslStream? _stream;
-    Channel<byte[]>? _frames;
+    Channel<(bool Video, byte[] Bytes)>? _out;
     TaskCompletionSource<(int, int)>? _size;
-    bool _capturing;
+    bool _capturing, _announced;
+    int _pendingVideo;
+    (int, int) _lastSize;
+    volatile bool _immersive;
 
     public string Fingerprint { get; }
     public int Port { get; }
+    public int ApplePort { get; set; }
+    public bool Streaming => _stream is not null;
 
     public Desktop(byte[] pfx, int port, Func<string?> tokenHash)
     {
@@ -106,25 +103,29 @@ sealed class Desktop : IDisposable
                 return;
             }
             Log.Write($"desktop hello {client.Client.RemoteEndPoint}");
-            Channel<byte[]> frames;
+            Channel<(bool Video, byte[] Bytes)> outbound;
             TaskCompletionSource<(int, int)> size;
             lock (_gate)
             {
                 _stream?.Dispose();
                 _stream = ssl;
-                _frames = frames = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(3) { FullMode = BoundedChannelFullMode.DropOldest }, _ => vindos_desktop_idr());
+                _announced = false;
+                _pendingVideo = 0;
+                _out = outbound = Channel.CreateUnbounded<(bool, byte[])>(new UnboundedChannelOptions { SingleReader = true });
                 _size = size = new TaskCompletionSource<(int, int)>(TaskCreationOptions.RunContinuationsAsynchronously);
                 if (!_capturing) { _capturing = true; if (vindos_desktop_start(Fps, Bitrate, _onFrame, _onEvent) != 0) throw new InvalidOperationException("Capture already running."); }
                 else size.TrySetResult(_lastSize);
             }
-            vindos_desktop_idr();
             var (w, h) = await size.Task.WaitAsync(TimeSpan.FromSeconds(5), _cts.Token);
-            await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "stream", width = w, height = h, fps = Fps }));
+            Send(new { v = 1, type = "stream", width = w, height = h, fps = Fps });
+            Send(new { v = 1, type = "games", games = Game.Installed().Select(g => new { id = g.Id, name = g.Name }).ToArray() });
+            _announced = true;
+            vindos_desktop_idr();
             Log.Write($"desktop stream sent {w}x{h}");
-            await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "games", games = Game.Installed().Select(g => new { id = g.Id, name = g.Name }).ToArray() }));
             StatusChanged?.Invoke("Vision Pro is viewing this desktop.");
             long sent = 0;
             var lastReport = Environment.TickCount64;
+            var sendDelays = new List<long>(128);
             vindos_desktop_rect(out var left, out var top, out var right, out var bottom);
             var input = new Input(left, top, right - left, bottom - top);
             var reader = Task.Run(async () =>
@@ -138,7 +139,7 @@ sealed class Desktop : IDisposable
                         if (k != 1) continue;
                         using var doc = JsonDocument.Parse(p);
                         var type = doc.RootElement.GetProperty("type").GetString();
-                        Log.Write($"desktop control {type} after {sent} frames");
+                        if (type != "clock") Log.Write($"desktop control {type} after {sent} frames");
                         switch (type)
                         {
                             case "keyframe": vindos_desktop_idr(); break;
@@ -146,12 +147,18 @@ sealed class Desktop : IDisposable
                             case "immersive":
                                 if (!_immersive) { _immersive = true; lock (_gate) StopCapture(); }
                                 var reason = ImmersiveRequested is null ? "unsupported" : await ImmersiveRequested();
-                                if (reason is null) await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "immersive", port = ApplePort }));
+                                if (reason is null) Send(new { v = 1, type = "immersive", port = ApplePort });
                                 else { Log.Write($"immersive failed {reason}"); await EndImmersiveAsync(); }
                                 break;
                             case "windowed":
                                 if (DesktopRequested is not null) await DesktopRequested();
                                 await EndImmersiveAsync();
+                                break;
+                            case "clock":
+                                Send(new { v = 1, type = "clock", t1 = doc.RootElement.GetProperty("t1").GetInt64(), t2 = vindos_desktop_now_us() });
+                                break;
+                            case "latency":
+                                Log.Write($"headset latency {doc.RootElement.GetRawText()}");
                                 break;
                             case "recenter":
                                 Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "sent" : "ignored: game not in foreground")}");
@@ -160,7 +167,7 @@ sealed class Desktop : IDisposable
                                 var id = doc.RootElement.GetProperty("id").GetString() ?? "";
                                 var failure = !_immersive ? "not in immersive mode" : GameRequested is null ? "unsupported" : await GameRequested(id);
                                 if (failure is not null) Log.Write($"game {id} refused: {failure}");
-                                await WriteAsync(ssl, 1, failure is null ? JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = true }) : JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "game", id, running = false, reason = failure }));
+                                if (failure is null) Send(new { v = 1, type = "game", id, running = true }); else Send(new { v = 1, type = "game", id, running = false, reason = failure });
                                 break;
                         }
                     }
@@ -171,15 +178,25 @@ sealed class Desktop : IDisposable
                     input.ReleaseAll();
                     Log.Write($"desktop input {input.Summary}");
                     if (_immersive) { _immersive = false; if (DesktopRequested is not null) await DesktopRequested(); }
+                    outbound.Writer.TryComplete();
                 }
             });
-            await foreach (var frame in frames.Reader.ReadAllAsync(_cts.Token))
+            await foreach (var (video, bytes) in outbound.Reader.ReadAllAsync(_cts.Token))
             {
-                if (reader.IsCompleted) break;
-                await ssl.WriteAsync(frame, _cts.Token);
+                await ssl.WriteAsync(bytes, _cts.Token);
+                if (!video) continue;
+                Interlocked.Decrement(ref _pendingVideo);
                 sent++;
-                if (Environment.TickCount64 - lastReport >= 1000) { lastReport = Environment.TickCount64; Log.Write($"desktop frames={sent} {input.Summary}"); }
+                sendDelays.Add(vindos_desktop_now_us() - BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(5)));
+                if (Environment.TickCount64 - lastReport >= 1000)
+                {
+                    lastReport = Environment.TickCount64;
+                    sendDelays.Sort();
+                    Log.Write($"desktop frames={sent} captureToSend p50={sendDelays[sendDelays.Count / 2] / 1000.0:F1}ms p95={sendDelays[(int)(sendDelays.Count * 0.95)] / 1000.0:F1}ms n={sendDelays.Count} {input.Summary}");
+                    sendDelays.Clear();
+                }
             }
+            await reader;
             Log.Write($"desktop session end after {sent} frames");
         }
         catch (Exception e) when (e is IOException or EndOfStreamException or InvalidDataException or AuthenticationException or OperationCanceledException or TimeoutException or JsonException or KeyNotFoundException)
@@ -188,11 +205,19 @@ sealed class Desktop : IDisposable
         }
         finally
         {
-            lock (_gate) if (ReferenceEquals(_stream, ssl)) { _stream = null; _frames = null; StopCapture(); StatusChanged?.Invoke(null!); }
+            lock (_gate) if (ReferenceEquals(_stream, ssl)) { _stream = null; _out = null; StopCapture(); StatusChanged?.Invoke(null!); }
         }
     }
 
-    (int, int) _lastSize;
+    void Send(object control)
+    {
+        var payload = JsonSerializer.SerializeToUtf8Bytes(control);
+        var frame = new byte[5 + payload.Length];
+        BinaryPrimitives.WriteUInt32LittleEndian(frame, (uint)(1 + payload.Length));
+        frame[4] = 1;
+        payload.CopyTo(frame, 5);
+        _out?.Writer.TryWrite((false, frame));
+    }
 
     void OnEvent(int code, int value)
     {
@@ -203,13 +228,15 @@ sealed class Desktop : IDisposable
 
     void OnFrame(long pts, int flags, nint data, int length)
     {
+        if (!_announced) return;
+        if (Interlocked.Increment(ref _pendingVideo) > 3) { Interlocked.Decrement(ref _pendingVideo); vindos_desktop_idr(); return; }
         var frame = new byte[14 + length];
         BinaryPrimitives.WriteUInt32LittleEndian(frame, (uint)(10 + length));
         frame[4] = 0;
         BinaryPrimitives.WriteInt64LittleEndian(frame.AsSpan(5), pts);
         frame[13] = (byte)flags;
         Marshal.Copy(data, frame, 14, length);
-        _frames?.Writer.TryWrite(frame);
+        if (_out?.Writer.TryWrite((true, frame)) != true) Interlocked.Decrement(ref _pendingVideo);
     }
 
     void StopCapture()
@@ -226,23 +253,24 @@ sealed class Desktop : IDisposable
         vindos_desktop_start(Fps, Bitrate, _onFrame, _onEvent);
     }
 
-    public async Task EndImmersiveAsync()
+    public Task EndImmersiveAsync()
     {
-        SslStream? stream;
         lock (_gate)
         {
-            if (!_immersive) return;
+            if (!_immersive) return Task.CompletedTask;
             _immersive = false;
             StartCapture();
-            stream = _stream;
         }
         vindos_desktop_idr();
-        if (stream is not null) try { await WriteAsync(stream, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "windowed" })); } catch (Exception e) { Log.Write($"windowed send failed {e.Message}"); }
+        Send(new { v = 1, type = "windowed" });
+        return Task.CompletedTask;
     }
 
-    public int ApplePort { get; set; }
-    public bool Streaming => _stream is not null;
-    volatile bool _immersive;
+    public Task GameEndedAsync(string id, string reason)
+    {
+        if (_immersive) Send(new { v = 1, type = "game", id, running = false, reason });
+        return Task.CompletedTask;
+    }
 
     public void Disconnect()
     {
@@ -258,15 +286,6 @@ sealed class Desktop : IDisposable
         var body = new byte[length];
         await s.ReadExactlyAsync(body);
         return (body[0], body[1..]);
-    }
-
-    static async Task WriteAsync(SslStream s, byte kind, byte[] payload)
-    {
-        var frame = new byte[5 + payload.Length];
-        BinaryPrimitives.WriteUInt32LittleEndian(frame, (uint)(1 + payload.Length));
-        frame[4] = kind;
-        payload.CopyTo(frame, 5);
-        await s.WriteAsync(frame);
     }
 
     public void Dispose()

@@ -25,6 +25,7 @@ static std::atomic<bool> d_quit{ false }, d_idr{ false };
 static std::thread d_thread;
 static std::mutex d_lifecycle;
 static RECT d_rect{};
+static std::atomic<int64_t> d_epoch{ 0 }; static int64_t d_freq = 0;
 
 struct Grabber final : IMFSampleGrabberSinkCallback {
 	std::atomic<ULONG> refs{ 1 }; FrameFn cb; std::vector<uint8_t> out, sps, pps;
@@ -115,6 +116,7 @@ static void run(uint32_t fps, uint32_t bitrate, FrameFn frame, DesktopEventFn ev
 		HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
 		LARGE_INTEGER freq, now; QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&now);
 		const int64_t period = freq.QuadPart / fps, epoch = now.QuadPart; int64_t next = now.QuadPart, lastSubmit = 0;
+		d_freq = freq.QuadPart; d_epoch = epoch;
 		ev(2, 1);
 		while (!d_quit) {
 			QueryPerformanceCounter(&now);
@@ -150,5 +152,6 @@ extern "C" __declspec(dllexport) int32_t vindos_desktop_start(uint32_t fps, uint
 	return 0;
 }
 extern "C" __declspec(dllexport) void vindos_desktop_idr() { d_idr = true; }
+extern "C" __declspec(dllexport) int64_t vindos_desktop_now_us() { LARGE_INTEGER now; QueryPerformanceCounter(&now); return d_freq ? (now.QuadPart - d_epoch.load()) * 1000000 / d_freq : -1; }
 extern "C" __declspec(dllexport) void vindos_desktop_rect(int32_t* left, int32_t* top, int32_t* right, int32_t* bottom) { *left = d_rect.left; *top = d_rect.top; *right = d_rect.right; *bottom = d_rect.bottom; }
 extern "C" __declspec(dllexport) void vindos_desktop_stop() { std::lock_guard<std::mutex> lock(d_lifecycle); d_quit = true; if (d_thread.joinable()) d_thread.join(); }
