@@ -9,6 +9,7 @@ final class Desktop {
 
     private(set) var state = State.idle
     var windowOpen = false
+    private(set) var sent = [UInt8: Int]()
     let video = VideoStream()
     private var connection: NWConnection?
     private var browser: NWBrowser?
@@ -32,6 +33,12 @@ final class Desktop {
             }
         }
         browser.start(queue: .main)
+    }
+
+    func send(_ input: Input) {
+        guard case .streaming = state else { return }
+        sent[input.record[0], default: 0] += 1
+        connection?.send(content: Frame.input(input.record), completion: .idempotent)
     }
 
     func disconnect() {
@@ -112,11 +119,13 @@ final class Desktop {
 }
 
 enum Frame {
-    static func control(_ object: [String: Any]) -> Data {
-        let body = try! JSONSerialization.data(withJSONObject: object)
+    static func control(_ object: [String: Any]) -> Data { frame(1, try! JSONSerialization.data(withJSONObject: object)) }
+    static func input(_ record: Data) -> Data { frame(2, record) }
+
+    private static func frame(_ type: UInt8, _ body: Data) -> Data {
         var frame = Data(count: 4)
         frame.withUnsafeMutableBytes { $0.storeBytes(of: UInt32(body.count + 1).littleEndian, as: UInt32.self) }
-        frame.append(1)
+        frame.append(type)
         frame.append(body)
         return frame
     }

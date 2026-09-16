@@ -4,6 +4,7 @@ struct HomeView: View {
     let connection: Connection
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var showingSettings = false
 
     var body: some View {
@@ -17,6 +18,16 @@ struct HomeView: View {
             }
             .padding(32)
             .navigationTitle("vindOS")
+            .onAppear {
+                connection.homeWindows += 1
+                if connection.homeWindows > 1 { dismissWindow() }
+            }
+            .onDisappear { connection.homeWindows -= 1 }
+            .task {
+                #if targetEnvironment(simulator)
+                SimulatorScript.run(connection, desktop, connect: { connection.pair.map(connect) }, disconnect: desktop.disconnect)
+                #endif
+            }
             .toolbar {
                 Button("Settings", systemImage: "gear") { showingSettings = true }
             }
@@ -37,6 +48,12 @@ struct HomeView: View {
         }
     }
 
+    private func connect(_ pair: SavedPair) {
+        desktop.connect(to: pair)
+        if !desktop.windowOpen { openWindow(id: "desktop") }
+        dismissWindow()
+    }
+
     private var status: String {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): "Pairing…"
@@ -50,10 +67,7 @@ struct HomeView: View {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
         case (_, let pair?):
-            Button("Connect") {
-                desktop.connect(to: pair)
-                if !desktop.windowOpen { openWindow(id: "desktop") }
-            }
+            Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)
             .disabled(desktop.state == .connecting)
         }

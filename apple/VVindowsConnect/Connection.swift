@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoveatedStreaming)
 import FoveatedStreaming
+#endif
 import Observation
 
 @MainActor @Observable
@@ -9,6 +11,7 @@ final class Connection {
     let session = FoveatedStreamingSession()
     private(set) var pair = SavedPair.load()
     private(set) var activity = Activity.idle
+    var homeWindows = 0
     private var pairing: Task<Void, Never>?
 
     func startPairing() {
