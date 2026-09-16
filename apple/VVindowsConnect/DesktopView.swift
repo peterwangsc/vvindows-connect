@@ -28,13 +28,14 @@ struct DesktopView: View {
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .onAppear {
-            if desktop.windowOpen || desktop.state == .idle { return toHome() }
+            desktop.reopening = false
+            if desktop.state == .idle { return toHome() }
             desktop.windowOpen = true
             dismissWindow(id: "home")
         }
         .onDisappear {
             desktop.windowOpen = false
-            if desktop.immersion == .off { desktop.disconnect() }
+            if desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
         }
         .onChange(of: desktop.immersion) { _, immersion in
             if immersion == .on { toHome() }
@@ -79,6 +80,7 @@ struct ImmersiveExit: View {
     var body: some View {
         Color.clear.onDisappear {
             desktop.leaveImmersive()
+            desktop.reopening = true
             openWindow(id: "desktop")
         }
     }

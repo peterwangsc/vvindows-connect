@@ -17,6 +17,7 @@ final class Desktop {
     private(set) var immersion = Immersion.off
     private var hostAddress: (any IPAddress)?
     var windowOpen = false
+    var reopening = false
     private(set) var sent = [UInt8: Int]()
     let video = VideoStream()
     private var connection: NWConnection?
