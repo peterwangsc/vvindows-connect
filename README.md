@@ -28,20 +28,22 @@ Platform-owned permission UI remains platform-owned.
 
 ## Current milestone
 
-**Input: pointer, physical and virtual keyboard, balanced releases on
-disconnect, verified in the real windowed product.**
+**Immersive: the same saved connection, explicit fullscreen and Apple Allow,
+one owned PC application, and reliable return to the desktop.**
 
 Verified on hardware on 2026-09-16:
 
 - Pair once through both apps: Windows Pair, Vision Pro Pair, select the PC,
   scan the QR, no PC click. Restart keeps the pair; Forget clears it on both
-  sides.
+  sides; a later pair with the same PC skips the QR.
 - Windowed desktop: Connect opens the Windows desktop in a window over a pinned
   TLS 1.3 connection whose credentials arrived over the Apple-authenticated
   pairing session. Motion is visible, Disconnect and reconnect work.
+- Input: pointer, click, drag, trackpad scroll, physical keyboard and the
+  visionOS keyboard all reach Windows. Windows running as administrator ignore
+  injected input (UIPI); vindOS runs as a normal user.
 
-Not yet verified: reconnecting the Apple session without a second scan (only
-needed for immersive), and any latency figure.
+Not yet verified: any latency figure. The simulator build stubs the Apple
+streaming session and is for UI checks only; it is not a hardware result.
 
-Immersive PC games follow, through the same applications. Each step must leave
-a usable product.
+Each step must leave a usable product.
