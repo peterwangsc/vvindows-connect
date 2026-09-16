@@ -2,6 +2,8 @@ import SwiftUI
 
 struct HomeView: View {
     let connection: Connection
+    let desktop: Desktop
+    @Environment(\.openWindow) private var openWindow
     @State private var showingSettings = false
 
     var body: some View {
@@ -21,6 +23,7 @@ struct HomeView: View {
             .sheet(isPresented: $showingSettings) {
                 List {
                     Button("Forget connection", role: .destructive) {
+                        desktop.disconnect()
                         connection.forget()
                         showingSettings = false
                     }
@@ -43,7 +46,13 @@ struct HomeView: View {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
-        default: Button("Connect") {}.buttonStyle(.borderedProminent).disabled(true)
+        case (_, let pair?):
+            Button("Connect") {
+                desktop.connect(to: pair)
+                openWindow(id: "desktop")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(desktop.state != .idle)
         }
     }
 }

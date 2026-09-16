@@ -10,6 +10,12 @@
 		A000000000000000000000A3 /* PairedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedMessage.swift; sourceTree = "<group>"; };
 		A000000000000000000000A4 /* SavedPair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPair.swift; sourceTree = "<group>"; };
 		A000000000000000000000A5 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A000000000000000000000A9 /* Desktop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Desktop.swift; sourceTree = "<group>"; };
+		A00000000000000000000A10 /* VideoStream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStream.swift; sourceTree = "<group>"; };
+		A00000000000000000000A11 /* DesktopView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopView.swift; sourceTree = "<group>"; };
+		B000000000000000000000B9 = {isa = PBXBuildFile; fileRef = A000000000000000000000A9; };
+		B00000000000000000000B10 = {isa = PBXBuildFile; fileRef = A00000000000000000000A10; };
+		B00000000000000000000B11 = {isa = PBXBuildFile; fileRef = A00000000000000000000A11; };
 		A000000000000000000000A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* VVindowsConnect.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VVindowsConnect.entitlements; sourceTree = "<group>"; };
 		A000000000000000000000A8 /* VVindowsConnect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VVindowsConnect.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -20,7 +26,7 @@
 		B000000000000000000000B5 = {isa = PBXBuildFile; fileRef = A000000000000000000000A5; };
 		C000000000000000000000C1 /* VVindowsConnect */ = {
 			isa = PBXGroup;
-			children = (A000000000000000000000A1, A000000000000000000000A2, A000000000000000000000A3, A000000000000000000000A4, A000000000000000000000A5, A000000000000000000000A6, A000000000000000000000A7);
+			children = (A000000000000000000000A1, A000000000000000000000A2, A000000000000000000000A3, A000000000000000000000A4, A000000000000000000000A5, A000000000000000000000A9, A00000000000000000000A10, A00000000000000000000A11, A000000000000000000000A6, A000000000000000000000A7);
 			path = VVindowsConnect;
 			sourceTree = "<group>";
 		};
@@ -38,7 +44,7 @@
 		D000000000000000000000D1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (B000000000000000000000B1, B000000000000000000000B2, B000000000000000000000B3, B000000000000000000000B4, B000000000000000000000B5);
+			files = (B000000000000000000000B1, B000000000000000000000B2, B000000000000000000000B3, B000000000000000000000B4, B000000000000000000000B5, B000000000000000000000B9, B00000000000000000000B10, B00000000000000000000B11);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D000000000000000000000D2 /* Frameworks */ = {

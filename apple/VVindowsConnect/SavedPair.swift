@@ -4,11 +4,13 @@ import Security
 struct SavedPair: Codable, Equatable {
     let serverId: String
     let hostName: String
+    let desktop: PairedMessage.Desktop
     let pairedAt: Date
 
     init(_ message: PairedMessage) {
         serverId = message.serverId
         hostName = message.hostName
+        desktop = message.desktop
         pairedAt = .now
     }
 
