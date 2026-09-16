@@ -81,7 +81,6 @@ enum SimulatorScript {
                 case "connect": connect()
                 case "disconnect": disconnect()
                 case "windowed": desktop.leaveImmersive()
-                case "play": desktop.games.first.map(desktop.play)
                 default: if let action = actions[String(step)] { action() } else { try? await Task.sleep(for: .seconds(Double(step) ?? 1)) }
                 }
             }

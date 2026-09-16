@@ -11,13 +11,11 @@ import FoveatedStreaming
 final class Desktop {
     enum State: Equatable { case idle, connecting, streaming(width: Int, height: Int), failed(String) }
     enum Immersion: Equatable { case off, starting, on }
-    struct Game: Decodable, Equatable, Identifiable { let id: String; let name: String }
-    enum GameState: Equatable { case none, starting(Game), running(Game), failed(String) }
+    enum GameState: Equatable { case none, running(String), stopped(String) }
 
     let session: FoveatedStreamingSession
     private(set) var state = State.idle
     private(set) var immersion = Immersion.off
-    private(set) var games: [Game] = []
     private(set) var game = GameState.none
     private var hostAddress: (any IPAddress)?
     var desktopWindows = 0
@@ -38,12 +36,6 @@ final class Desktop {
 
     func immersiveConnected() {
         if immersion == .starting { immersion = .on }
-    }
-
-    func play(_ game: Game) {
-        guard immersion == .on else { return }
-        self.game = .starting(game)
-        connection?.send(content: Frame.control(["v": 1, "type": "game", "id": game.id]), completion: .idempotent)
     }
 
     func recenter() {
@@ -162,11 +154,9 @@ final class Desktop {
                 Task {
                     do { try await session.connect(endpoint: .local(ipAddress: host, port: port)) } catch { leaveImmersive() }
                 }
-            case "games":
-                games = (try? JSONDecoder().decode([Game].self, from: JSONSerialization.data(withJSONObject: json["games"] ?? []))) ?? []
             case "game":
-                guard let id = json["id"] as? String, let known = games.first(where: { $0.id == id }) else { return }
-                game = json["running"] as? Bool == true ? .running(known) : (json["reason"] as? String).map { .failed($0) } ?? .none
+                let name = json["name"] as? String ?? json["id"] as? String ?? "Game"
+                game = json["running"] as? Bool == true ? .running(name) : .stopped(name)
             case "windowed":
                 if immersion == .on { leaveImmersive() }
                 video.reset()

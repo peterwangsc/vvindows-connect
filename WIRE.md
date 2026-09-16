@@ -104,16 +104,14 @@ encrypted by the vendor; the desktop stream is.
 
 ## Games
 
-A game runs inside the immersive session: the host ends its own quad session
-and launches one owned game process whose OpenXR session takes over the same
-stream. No new connection, port or trust.
+The Windows client scans the Steam library once at install and shows a Play
+button per VR-capable title. Play while the headset is immersive launches the
+game on our OpenXR runtime and it takes over the stream; Play while windowed
+launches it normally on the desktop. The headset only reports status.
 
 | `type` | direction | fields | meaning |
 | --- | --- | --- | --- |
-| `games` | host → headset | `games`: list of `{id, name}` | sent once after `stream`; what the host found installed, possibly empty |
-| `game` | headset → host | `id` | start this game; only while immersive |
-| `game` | host → headset | `id`, `running`, optional `reason` | `running: true` once the process is up; `running: false` when it exits or fails, after which the host's quad session is back |
-
-| `recenter` | headset → host | | while a game runs: the host sends the game's recenter chord to its window (Assetto Corsa: Ctrl+Space); no reply |
+| `game` | host → headset | `name`, `running` | status line: running, or stopped |
+| `recenter` | headset → host | | while a VR game runs: the host sends the game's recenter chord (Assetto Corsa: Ctrl+Space); otherwise it re-places the desktop quad in front of the viewer |
 
 `windowed` while a game runs kills the game first, then returns as usual.
