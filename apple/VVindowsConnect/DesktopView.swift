@@ -92,9 +92,9 @@ struct ImmersiveContent: View {
         RealityView { content, attachments in
             var material = UnlitMaterial(color: .clear)
             material.blending = .transparent(opacity: .init(floatLiteral: 0))
-            let shell = ModelEntity(mesh: .generateSphere(radius: 3), materials: [material])
+            let shell = ModelEntity(mesh: .generateSphere(radius: 30), materials: [material])
             shell.components.set(InputTargetComponent())
-            shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
+            shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 30)]))
             content.add(shell)
             if let panel = attachments.entity(for: "hud") {
                 panel.isEnabled = false
