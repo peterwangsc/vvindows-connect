@@ -75,6 +75,8 @@ sealed class Game : IDisposable
     readonly Timer _watch;
     public GameEntry Entry { get; }
     public event Action<int>? Exited;
+    public event Action<string>? VrLoaded;
+    bool _vr;
 
     public Game(GameEntry entry, bool immersive)
     {
@@ -91,7 +93,11 @@ sealed class Game : IDisposable
         _process = Process.Start(start)!;
         AssignProcessToJobObject(_job, _process.Handle);
         Log.Write($"game {entry.Id} started {Path.GetFileName(entry.Exe)} pid {_process.Id} {(immersive ? "immersive" : "desktop")}");
-        _watch = new Timer(_ => { if (!Running) { _watch!.Dispose(); var code = _process.HasExited ? _process.ExitCode : 0; Log.Write($"game {entry.Id} exited {code}"); Exited?.Invoke(code); } }, null, 1000, 1000);
+        _watch = new Timer(_ =>
+        {
+            if (!Running) { _watch!.Dispose(); var code = _process.HasExited ? _process.ExitCode : 0; Log.Write($"game {entry.Id} exited {code}"); Exited?.Invoke(code); return; }
+            if (!_vr && VrModule() is { } module) { _vr = true; Log.Write($"game {entry.Id} loaded {module}"); VrLoaded?.Invoke(module); }
+        }, null, 250, 250);
     }
 
     public static string Foreground()
@@ -103,6 +109,34 @@ sealed class Game : IDisposable
         string process;
         try { process = Process.GetProcessById((int)pid).ProcessName; } catch { process = "?"; }
         return $"class={name} process={process}";
+    }
+
+    string? VrModule()
+    {
+        foreach (var p in Process.GetProcesses())
+        {
+            using (p)
+            {
+                if (!InJob((uint)p.Id)) continue;
+                try
+                {
+                    foreach (ProcessModule m in p.Modules)
+                        if (m.ModuleName.Equals("openxr_loader.dll", StringComparison.OrdinalIgnoreCase) || m.ModuleName.Equals("openvr_api.dll", StringComparison.OrdinalIgnoreCase))
+                            return $"{m.ModuleName} in {p.ProcessName} pid {p.Id}";
+                }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { }
+            }
+        }
+        return null;
+    }
+
+    bool InJob(uint pid)
+    {
+        var h = OpenProcess(0x1000, false, pid);
+        if (h == 0) return false;
+        var owns = IsProcessInJob(h, _job, out var inJob) && inJob;
+        CloseHandle(h);
+        return owns;
     }
 
     public bool Running
@@ -117,11 +151,7 @@ sealed class Game : IDisposable
     public bool Recenter()
     {
         GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
-        var h = OpenProcess(0x1000, false, pid);
-        if (h == 0) return false;
-        var owns = IsProcessInJob(h, _job, out var inJob) && inJob;
-        CloseHandle(h);
-        if (!owns) return false;
+        if (!InJob(pid)) return false;
         Input.Chord(RecenterScans);
         return true;
     }

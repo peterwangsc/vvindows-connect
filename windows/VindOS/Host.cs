@@ -219,16 +219,15 @@ sealed class Host : IDisposable
         {
             if (_game is not null) return _game.Running ? $"{_game.Entry.Name} is already running." : "The previous game is still closing.";
             immersive = _immersive;
-            if (immersive) { _xr?.Dispose(); _xr = null; }
             try { _game = new Game(entry, immersive); }
             catch (Exception e)
             {
                 Log.Write($"game {entry.Id} start failed {e.Message}");
-                if (immersive) { var error = await StartXrAsync(null, true); if (error is not null) Log.Write($"quad restart failed {error}"); }
                 return e.Message;
             }
             var game = _game;
             game.Exited += code => _ = OnGameExitedAsync(game, code);
+            game.VrLoaded += module => _ = YieldQuadAsync(game);
             GameChanged?.Invoke(entry);
             StatusChanged?.Invoke(immersive ? $"{entry.Name} is running in Immersive Mode." : $"{entry.Name} is running on the desktop.");
             _ = Task.Delay(TimeSpan.FromSeconds(8), _cts.Token).ContinueWith(_ => Log.Write($"foreground after game start: {Game.Foreground()}"), TaskContinuationOptions.OnlyOnRanToCompletion);
@@ -239,6 +238,19 @@ sealed class Host : IDisposable
     }
 
     public void StopGame() => _game?.Stop();
+
+    async Task YieldQuadAsync(Game game)
+    {
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
+        {
+            if (!ReferenceEquals(_game, game) || !_immersive || _xr is null) return;
+            _xr.Dispose();
+            _xr = null;
+            Log.Write($"quad yielded to {game.Entry.Id}");
+        }
+        finally { _lifecycle.Release(); }
+    }
 
     async Task OnGameExitedAsync(Game game, int code)
     {
