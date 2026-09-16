@@ -1,0 +1,9 @@
+vindOS Pre-release License
+
+vindOS is pre-release software from Peter Wang. It is provided "as is", without warranty of any kind, express or implied, including fitness for a particular purpose. Use it at your own risk.
+
+vindOS installs no NVIDIA software. To use Fullscreen and VR games you download the NVIDIA CloudXR Runtime and Stream Manager yourself from NVIDIA NGC and accept NVIDIA's terms; vindOS only reads the archives you place in its CloudXR folder.
+
+For OpenVR games you choose, vindOS replaces the game's openvr_api.dll with the OpenComposite bridge and keeps the original beside it; Settings restores the originals at any time, and uninstalling restores them.
+
+vindOS is not affiliated with or endorsed by Apple, Microsoft, NVIDIA, Valve or Kunos Simulazioni. Steam, Windows, Apple Vision Pro and other names are trademarks of their owners.
