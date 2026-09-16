@@ -20,7 +20,8 @@ struct HomeView: View {
             .navigationTitle("vindOS")
             .onAppear {
                 connection.homeWindows += 1
-                if connection.homeWindows > 1 { dismissWindow() }
+                if connection.homeWindows > 1 { return dismissWindow() }
+                if desktop.desktopWindows > 0, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
             .task {
@@ -50,13 +51,13 @@ struct HomeView: View {
 
     private func connect(_ pair: SavedPair) {
         desktop.connect(to: pair)
-        if !desktop.windowOpen { openWindow(id: "desktop") }
-        dismissWindow()
+        openWindow(id: "desktop")
     }
 
     private var status: String {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): "Pairing…"
+        case (_, let pair?) where desktop.immersion != .off: "Fullscreen on \(pair.hostName)"
         case (_, let pair?): "Paired with \(pair.hostName)"
         default: "Not paired"
         }
@@ -66,6 +67,8 @@ struct HomeView: View {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
+        case (_, _?) where desktop.immersion != .off:
+            Button("Windowed") { desktop.leaveImmersive() }.buttonStyle(.borderedProminent)
         case (_, let pair?):
             Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)

@@ -49,7 +49,7 @@ final class VideoStream {
         CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
         guard let sample, let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) as? [NSMutableDictionary] else { return }
         attachments.first?[kCMSampleAttachmentKey_DisplayImmediately] = true
-        if layer.sampleBufferRenderer.status == .failed { layer.sampleBufferRenderer.flush() }
+        if layer.sampleBufferRenderer.status == .failed || layer.sampleBufferRenderer.requiresFlushToResumeDecoding { layer.sampleBufferRenderer.flush() }
         layer.sampleBufferRenderer.enqueue(sample)
     }
 
