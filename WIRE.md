@@ -61,3 +61,27 @@ Frames above 16 MiB drop the connection on both sides.
 | `stream` | host → headset | `width`, `height`, `fps` | reply to `hello`; video follows, starting with an IDR |
 | `keyframe` | headset → host | | send an IDR as soon as possible |
 | `bye` | both | | orderly close |
+
+## Input
+
+The desktop TLS connection is the control lease. When it closes for any
+reason, the host releases every held button and key. There is no other lease,
+heartbeat or capability negotiation.
+
+| type | direction | payload |
+| --- | --- | --- |
+| 2 INPUT | headset → host | one 16-byte record: `u8 kind`, `u8 flags`, `u16 reserved = 0`, `i32 LE a`, `i32 LE b`, `i32 LE c` |
+
+| kind | flags | a / b / c |
+| --- | --- | --- |
+| 1 move | 0 | x / y / 0, normalized 0..65535 over the streamed frame, origin top-left |
+| 2 button | bit 0 = down | x / y / button (1 left, 2 right, 3 middle) |
+| 3 wheel | 0 | vertical / horizontal / 0, Windows wheel units (120 per notch), positive vertical = away from the user |
+| 4 key | bit 0 = down | USB HID keyboard-page usage / 0 / 0; modifiers are ordinary key records |
+| 5 text | 0 | Unicode scalar / 0 / 0, committed text; never both a key and a text record for one keystroke |
+
+The host drops the connection on an unknown kind, nonzero reserved, an
+out-of-range value or a record that is not 16 bytes. Adjacent moves may be
+coalesced; nothing is reordered across a button, key or wheel. The headset
+sends at most one move per displayed frame. Neither side logs coordinates,
+keys or text.

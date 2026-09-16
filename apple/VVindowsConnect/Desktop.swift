@@ -34,6 +34,11 @@ final class Desktop {
         browser.start(queue: .main)
     }
 
+    func send(_ input: Input) {
+        guard case .streaming = state else { return }
+        connection?.send(content: Frame.input(input.record), completion: .idempotent)
+    }
+
     func disconnect() {
         browser?.cancel()
         browser = nil
@@ -112,11 +117,13 @@ final class Desktop {
 }
 
 enum Frame {
-    static func control(_ object: [String: Any]) -> Data {
-        let body = try! JSONSerialization.data(withJSONObject: object)
+    static func control(_ object: [String: Any]) -> Data { frame(1, try! JSONSerialization.data(withJSONObject: object)) }
+    static func input(_ record: Data) -> Data { frame(2, record) }
+
+    private static func frame(_ type: UInt8, _ body: Data) -> Data {
         var frame = Data(count: 4)
         frame.withUnsafeMutableBytes { $0.storeBytes(of: UInt32(body.count + 1).littleEndian, as: UInt32.self) }
-        frame.append(1)
+        frame.append(type)
         frame.append(body)
         return frame
     }

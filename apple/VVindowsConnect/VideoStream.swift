@@ -71,20 +71,18 @@ final class VideoStream {
 
 struct VideoView: UIViewRepresentable {
     let stream: VideoStream
+    let frameSize: CGSize
+    let send: (Input) -> Void
 
-    func makeUIView(context: Context) -> LayerHostView {
+    func makeUIView(context: Context) -> InputView {
         stream.layer.videoGravity = .resizeAspect
-        let view = LayerHostView()
+        let view = InputView()
         view.layer.addSublayer(stream.layer)
         return view
     }
 
-    func updateUIView(_ view: LayerHostView, context: Context) {}
-}
-
-final class LayerHostView: UIView {
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        layer.sublayers?.forEach { $0.frame = bounds }
+    func updateUIView(_ view: InputView, context: Context) {
+        view.frameSize = frameSize
+        view.send = send
     }
 }

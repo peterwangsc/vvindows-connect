@@ -5,9 +5,14 @@ struct DesktopView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
+    private var frameSize: CGSize {
+        if case .streaming(let w, let h) = desktop.state, w > 0, h > 0 { return CGSize(width: w, height: h) }
+        return CGSize(width: 16, height: 9)
+    }
+
     var body: some View {
         ZStack {
-            VideoView(stream: desktop.video)
+            VideoView(stream: desktop.video, frameSize: frameSize) { desktop.send($0) }
             switch desktop.state {
             case .connecting: ProgressView("Connecting…")
             case .failed(let reason): Text(reason).padding().glassBackgroundEffect()
