@@ -28,9 +28,10 @@ typedef void(__stdcall* EventFn)(int32_t kind, int32_t value);
 enum { EV_STAGE = 1, EV_SESSION = 2, EV_CHANNEL = 3, EV_SENT = 4, EV_ERROR = 5, EV_EXIT = 6 };
 enum { ST_INSTANCE = 1, ST_SYSTEM, ST_D3D, ST_SESSION, ST_SWAPCHAIN, ST_CHANNEL, ST_LOOP, ST_CAPTURE };
 
-static std::atomic<bool> g_quit{ false };
+static std::atomic<bool> g_quit{ false }, g_recenter{ false };
 static std::thread g_thread;
 static std::mutex g_lifecycle;
+#include <cmath>
 
 struct Swap { XrSwapchain handle; int32_t w, h; std::vector<XrSwapchainImageD3D11KHR> images; std::vector<ID3D11RenderTargetView*> rtvs; };
 
@@ -141,6 +142,7 @@ static void run(std::wstring runtimeJson, std::string paired, float quadWidth, f
 	ev(EV_STAGE, ST_LOOP);
 	int chanState = -1; auto lastPoll = std::chrono::steady_clock::now();
 	const float clear[4] = { 0.f, 0.f, 0.f, 1.f };
+	XrPosef quadPose = { {0, 0, 0, 1}, {0, 0, -quadDistance} }; bool quadPlaced = false; std::chrono::steady_clock::time_point visibleSince{};
 	while (!g_quit) {
 		XrEventDataBuffer eb = { XR_TYPE_EVENT_DATA_BUFFER };
 		while (xrPollEvent(inst, &eb) == XR_SUCCESS) {
@@ -171,6 +173,20 @@ static void run(std::wstring runtimeJson, std::string paired, float quadWidth, f
 			XrViewState vs = { XR_TYPE_VIEW_STATE }; XrViewLocateInfo li = { XR_TYPE_VIEW_LOCATE_INFO };
 			li.viewConfigurationType = vct; li.displayTime = fs.predictedDisplayTime; li.space = space;
 			uint32_t cnt = 0; xrLocateViews(sess, &li, &vs, vc, &cnt, views.data());
+			if (quadMode && cnt > 0 && (vs.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT)) {
+				if (visibleSince == std::chrono::steady_clock::time_point{}) visibleSince = std::chrono::steady_clock::now();
+				bool due = !quadPlaced && std::chrono::steady_clock::now() - visibleSince > std::chrono::milliseconds(1500);
+				if (due || g_recenter.exchange(false)) {
+					XrVector3f head = { 0, 0, 0 }; for (uint32_t i = 0; i < cnt; i++) { head.x += views[i].pose.position.x / cnt; head.y += views[i].pose.position.y / cnt; head.z += views[i].pose.position.z / cnt; }
+					XrQuaternionf q = views[0].pose.orientation;
+					float fx = -(2 * (q.x * q.z + q.w * q.y)), fz = -(1 - 2 * (q.x * q.x + q.y * q.y));
+					float len = std::sqrt(fx * fx + fz * fz); if (len < 1e-4f) { fx = 0; fz = -1; len = 1; } fx /= len; fz /= len;
+					float yaw = std::atan2(-fx, -fz);
+					quadPose.position = { head.x + fx * quadDistance, head.y, head.z + fz * quadDistance };
+					quadPose.orientation = { 0, std::sin(yaw / 2), 0, std::cos(yaw / 2) };
+					quadPlaced = true; ev(EV_STAGE, 100);
+				}
+			}
 			pv.resize(cnt, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW });
 			for (uint32_t i = 0; i < cnt; i++) {
 				uint32_t idx = 0; XrSwapchainImageAcquireInfo ai = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
@@ -197,7 +213,7 @@ static void run(std::wstring runtimeJson, std::string paired, float quadWidth, f
 					xrReleaseSwapchainImage(quad.handle, &ri);
 					qlayer.space = space; qlayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
 					qlayer.subImage.swapchain = quad.handle; qlayer.subImage.imageRect = { {0, 0}, {quad.w, quad.h} };
-					qlayer.pose = { {0, 0, 0, 1}, {0, 0, -quadDistance} };
+					qlayer.pose = quadPose;
 					qlayer.size = { quadWidth, quadWidth * quad.h / quad.w };
 					layers[layerCount++] = (XrCompositionLayerBaseHeader*)&qlayer;
 				}
@@ -220,6 +236,8 @@ extern "C" __declspec(dllexport) int32_t vindos_xr_start(const wchar_t* runtimeJ
 	g_thread = std::thread(run, std::wstring(runtimeJson), std::string(pairedJson ? pairedJson : ""), quadWidth, quadDistance, onEvent);
 	return 0;
 }
+
+extern "C" __declspec(dllexport) void vindos_xr_recenter() { g_recenter = true; }
 
 extern "C" __declspec(dllexport) void vindos_xr_stop() {
 	std::lock_guard<std::mutex> lock(g_lifecycle);

@@ -8,7 +8,6 @@ using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
-using System.Threading.Channels;
 
 namespace VindOS;
 
@@ -38,10 +37,11 @@ sealed class Desktop : IDisposable
     readonly EventFn _onEvent;
     readonly object _gate = new();
     SslStream? _stream;
-    Channel<(bool Video, byte[] Bytes)>? _out;
+    readonly System.Collections.Concurrent.ConcurrentQueue<byte[]> _control = new();
+    readonly Queue<byte[]> _video = new();
+    SemaphoreSlim? _signal;
     TaskCompletionSource<(int, int)>? _size;
     bool _capturing, _announced;
-    int _pendingVideo;
     (int, int) _lastSize;
     volatile bool _immersive;
 
@@ -103,15 +103,16 @@ sealed class Desktop : IDisposable
                 return;
             }
             Log.Write($"desktop hello {client.Client.RemoteEndPoint}");
-            Channel<(bool Video, byte[] Bytes)> outbound;
+            SemaphoreSlim signal;
             TaskCompletionSource<(int, int)> size;
             lock (_gate)
             {
                 _stream?.Dispose();
                 _stream = ssl;
                 _announced = false;
-                _pendingVideo = 0;
-                _out = outbound = Channel.CreateUnbounded<(bool, byte[])>(new UnboundedChannelOptions { SingleReader = true });
+                _control.Clear();
+                lock (_video) _video.Clear();
+                _signal = signal = new SemaphoreSlim(0);
                 _size = size = new TaskCompletionSource<(int, int)>(TaskCreationOptions.RunContinuationsAsynchronously);
                 if (!_capturing) { _capturing = true; if (vindos_desktop_start(Fps, Bitrate, _onFrame, _onEvent) != 0) throw new InvalidOperationException("Capture already running."); }
                 else size.TrySetResult(_lastSize);
@@ -161,7 +162,7 @@ sealed class Desktop : IDisposable
                                 Log.Write($"headset latency {doc.RootElement.GetRawText()}");
                                 break;
                             case "recenter":
-                                Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "sent" : "ignored: game not in foreground")}");
+                                Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "applied" : "ignored: nothing to recenter")}");
                                 break;
                             case "game":
                                 var id = doc.RootElement.GetProperty("id").GetString() ?? "";
@@ -178,17 +179,21 @@ sealed class Desktop : IDisposable
                     input.ReleaseAll();
                     Log.Write($"desktop input {input.Summary}");
                     if (_immersive) { _immersive = false; if (DesktopRequested is not null) await DesktopRequested(); }
-                    outbound.Writer.TryComplete();
+                    signal.Release();
                 }
             });
-            await foreach (var (video, bytes) in outbound.Reader.ReadAllAsync(_cts.Token))
+            while (true)
             {
+                await signal.WaitAsync(_cts.Token);
+                if (reader.IsCompleted) break;
+                while (_control.TryDequeue(out var control)) await ssl.WriteAsync(control, _cts.Token);
+                byte[]? bytes;
+                lock (_video) bytes = _video.Count > 0 ? _video.Dequeue() : null;
+                if (bytes is null) continue;
                 await ssl.WriteAsync(bytes, _cts.Token);
-                if (!video) continue;
-                Interlocked.Decrement(ref _pendingVideo);
                 sent++;
-                sendDelays.Add(vindos_desktop_now_us() - BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(5)));
-                if (Environment.TickCount64 - lastReport >= 1000)
+                if ((bytes[13] & 2) == 0) sendDelays.Add(vindos_desktop_now_us() - BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(5)));
+                if (Environment.TickCount64 - lastReport >= 1000 && sendDelays.Count > 0)
                 {
                     lastReport = Environment.TickCount64;
                     sendDelays.Sort();
@@ -205,7 +210,7 @@ sealed class Desktop : IDisposable
         }
         finally
         {
-            lock (_gate) if (ReferenceEquals(_stream, ssl)) { _stream = null; _out = null; StopCapture(); StatusChanged?.Invoke(null!); }
+            lock (_gate) if (ReferenceEquals(_stream, ssl)) { _stream = null; _signal = null; StopCapture(); StatusChanged?.Invoke(null!); }
         }
     }
 
@@ -216,7 +221,8 @@ sealed class Desktop : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(frame, (uint)(1 + payload.Length));
         frame[4] = 1;
         payload.CopyTo(frame, 5);
-        _out?.Writer.TryWrite((false, frame));
+        _control.Enqueue(frame);
+        _signal?.Release();
     }
 
     void OnEvent(int code, int value)
@@ -229,14 +235,18 @@ sealed class Desktop : IDisposable
     void OnFrame(long pts, int flags, nint data, int length)
     {
         if (!_announced) return;
-        if (Interlocked.Increment(ref _pendingVideo) > 3) { Interlocked.Decrement(ref _pendingVideo); vindos_desktop_idr(); return; }
         var frame = new byte[14 + length];
         BinaryPrimitives.WriteUInt32LittleEndian(frame, (uint)(10 + length));
         frame[4] = 0;
         BinaryPrimitives.WriteInt64LittleEndian(frame.AsSpan(5), pts);
         frame[13] = (byte)flags;
         Marshal.Copy(data, frame, 14, length);
-        if (_out?.Writer.TryWrite((true, frame)) != true) Interlocked.Decrement(ref _pendingVideo);
+        lock (_video)
+        {
+            if (_video.Count >= 3) { _video.Dequeue(); vindos_desktop_idr(); }
+            _video.Enqueue(frame);
+        }
+        _signal?.Release();
     }
 
     void StopCapture()
