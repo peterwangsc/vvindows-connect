@@ -80,15 +80,11 @@ struct HomeView: View {
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
         case (_, _?) where desktop.immersion != .off:
             switch desktop.game {
-            case .starting(let game): ProgressView("Starting \(game.name)…")
-            case .running(let game): Text("Playing \(game.name)").foregroundStyle(.secondary)
-            case .failed(let reason): Text(reason).foregroundStyle(.secondary)
+            case .running(let name): Text("Playing \(name)").foregroundStyle(.secondary)
+            case .stopped(let name): Text("\(name) stopped").foregroundStyle(.secondary)
             case .none: EmptyView()
             }
             Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
-            if case .running = desktop.game {} else if case .starting = desktop.game {} else {
-                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) }.buttonStyle(.borderedProminent) }
-            }
             Button("Windowed") { desktop.leaveImmersive() }
             Button("Hide") { dismissWindow(id: "home") }
         case (_, let pair?):
