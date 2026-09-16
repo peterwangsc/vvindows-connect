@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -29,6 +30,7 @@ enum { ST_INSTANCE = 1, ST_SYSTEM, ST_D3D, ST_SESSION, ST_SWAPCHAIN, ST_CHANNEL,
 
 static std::atomic<bool> g_quit{ false };
 static std::thread g_thread;
+static std::mutex g_lifecycle;
 
 struct Swap { XrSwapchain handle; int32_t w, h; std::vector<XrSwapchainImageD3D11KHR> images; std::vector<ID3D11RenderTargetView*> rtvs; };
 
@@ -212,6 +214,7 @@ static void run(std::wstring runtimeJson, std::string paired, float quadWidth, f
 }
 
 extern "C" __declspec(dllexport) int32_t vindos_xr_start(const wchar_t* runtimeJson, const char* pairedJson, float quadWidth, float quadDistance, EventFn onEvent) {
+	std::lock_guard<std::mutex> lock(g_lifecycle);
 	if (g_thread.joinable()) return -1;
 	g_quit = false;
 	g_thread = std::thread(run, std::wstring(runtimeJson), std::string(pairedJson ? pairedJson : ""), quadWidth, quadDistance, onEvent);
@@ -219,6 +222,7 @@ extern "C" __declspec(dllexport) int32_t vindos_xr_start(const wchar_t* runtimeJ
 }
 
 extern "C" __declspec(dllexport) void vindos_xr_stop() {
+	std::lock_guard<std::mutex> lock(g_lifecycle);
 	g_quit = true;
 	if (g_thread.joinable()) g_thread.join();
 }

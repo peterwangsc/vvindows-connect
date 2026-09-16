@@ -24,6 +24,7 @@ sealed class Host : IDisposable
     Session? _session;
     XrSession? _xr;
     bool _armed, _immersive;
+    readonly SemaphoreSlim _lifecycle = new(1, 1);
 
     public Pair? Pair { get; private set; } = PairStore.LoadPair();
     public string HostName => _bonjour.InstanceName;
@@ -146,14 +147,19 @@ sealed class Host : IDisposable
 
     async Task BeginStreamAsync()
     {
-        if (_xr is null)
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
         {
-            StatusChanged?.Invoke("Starting session…");
-            var paired = _session!.Reconnect ? null : Wire.Paired(_identity.ServerId, HostName, _desktop.Fingerprint, _session.DesktopToken);
-            var error = await StartXrAsync(paired, false);
-            if (error is not null) Log.Write($"xr start failed {error}");
+            if (_xr is null && _session is not null)
+            {
+                StatusChanged?.Invoke("Starting session…");
+                var paired = _session.Reconnect ? null : Wire.Paired(_identity.ServerId, HostName, _desktop.Fingerprint, _session.DesktopToken);
+                var error = await StartXrAsync(paired, false);
+                if (error is not null) Log.Write($"xr start failed {error}");
+            }
+            if (_session is not null) { await SendAsync(Wire.MediaStreamIsReady(_session.Id)); Log.Write("sent MediaStreamIsReady"); }
         }
-        if (_session is not null) { await SendAsync(Wire.MediaStreamIsReady(_session.Id)); Log.Write("sent MediaStreamIsReady"); }
+        finally { _lifecycle.Release(); }
     }
 
     async Task<string?> StartXrAsync(string? paired, bool quad)
@@ -176,33 +182,53 @@ sealed class Host : IDisposable
 
     async Task<string?> BeginImmersiveAsync()
     {
-        if (_immersive) return null;
-        var error = await StartXrAsync(null, true);
-        if (error is null) { _immersive = true; StatusChanged?.Invoke("Immersive Mode ready. Waiting for Vision Pro."); }
-        return error;
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
+        {
+            if (_immersive) return null;
+            var error = await StartXrAsync(null, true);
+            if (error is null) { _immersive = true; StatusChanged?.Invoke("Immersive Mode ready. Waiting for Vision Pro."); }
+            return error;
+        }
+        finally { _lifecycle.Release(); }
     }
 
     async Task EndImmersiveAsync()
     {
-        if (!_immersive) return;
-        _immersive = false;
-        if (_session is not null) await SendAsync(Wire.RequestSessionDisconnect(_session.Id));
-        _session = null;
-        _xr?.Dispose();
-        _xr = null;
-        _ = Task.Run(_manager.StopService);
-        Idle();
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
+        {
+            if (!_immersive) return;
+            _immersive = false;
+            if (_session is not null) await SendAsync(Wire.RequestSessionDisconnect(_session.Id));
+            TearDown();
+            Idle();
+        }
+        finally { _lifecycle.Release(); }
     }
 
     async Task EndSessionAsync()
+    {
+        await _lifecycle.WaitAsync(_cts.Token);
+        var wasImmersive = false;
+        try
+        {
+            TearDown();
+            wasImmersive = _immersive;
+            _immersive = false;
+        }
+        finally { _lifecycle.Release(); }
+        if (wasImmersive) await _desktop.EndImmersiveAsync();
+        Idle();
+        if (_armed) Arm();
+    }
+
+    void TearDown()
     {
         _session = null;
         _xr?.Dispose();
         _xr = null;
         _ = Task.Run(_manager.StopService);
-        if (_immersive) { _immersive = false; await _desktop.EndImmersiveAsync(); }
-        Idle();
-        if (_armed) Arm();
     }
 
     async Task DisconnectAsync()

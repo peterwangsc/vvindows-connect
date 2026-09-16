@@ -7,6 +7,7 @@
 #include <codecapi.h>
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -22,6 +23,7 @@ typedef void(__stdcall* DesktopEventFn)(int32_t code, int32_t value);
 
 static std::atomic<bool> d_quit{ false }, d_idr{ false };
 static std::thread d_thread;
+static std::mutex d_lifecycle;
 static RECT d_rect{};
 
 struct Grabber final : IMFSampleGrabberSinkCallback {
@@ -141,6 +143,7 @@ static void run(uint32_t fps, uint32_t bitrate, FrameFn frame, DesktopEventFn ev
 }
 
 extern "C" __declspec(dllexport) int32_t vindos_desktop_start(uint32_t fps, uint32_t bitrate, FrameFn onFrame, DesktopEventFn onEvent) {
+	std::lock_guard<std::mutex> lock(d_lifecycle);
 	if (d_thread.joinable()) return -1;
 	d_quit = false; d_idr = true;
 	d_thread = std::thread(run, fps, bitrate, onFrame, onEvent);
@@ -148,4 +151,4 @@ extern "C" __declspec(dllexport) int32_t vindos_desktop_start(uint32_t fps, uint
 }
 extern "C" __declspec(dllexport) void vindos_desktop_idr() { d_idr = true; }
 extern "C" __declspec(dllexport) void vindos_desktop_rect(int32_t* left, int32_t* top, int32_t* right, int32_t* bottom) { *left = d_rect.left; *top = d_rect.top; *right = d_rect.right; *bottom = d_rect.bottom; }
-extern "C" __declspec(dllexport) void vindos_desktop_stop() { d_quit = true; if (d_thread.joinable()) d_thread.join(); }
+extern "C" __declspec(dllexport) void vindos_desktop_stop() { std::lock_guard<std::mutex> lock(d_lifecycle); d_quit = true; if (d_thread.joinable()) d_thread.join(); }

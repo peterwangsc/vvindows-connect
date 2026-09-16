@@ -22,5 +22,10 @@ sealed class XrSession : IDisposable
         if (vindos_xr_start(StreamManager.RuntimeJson, pairedJson, desktopQuad ? QuadWidth : 0, QuadDistance, _callback) != 0) throw new InvalidOperationException("An OpenXR session is already running.");
     }
 
-    public void Dispose() => vindos_xr_stop();
+    int _disposed;
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0) vindos_xr_stop();
+    }
 }
