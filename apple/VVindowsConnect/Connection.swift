@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoveatedStreaming)
 import FoveatedStreaming
+#endif
 import Observation
 
 @MainActor @Observable

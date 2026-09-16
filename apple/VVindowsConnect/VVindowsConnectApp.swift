@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(FoveatedStreaming)
 import FoveatedStreaming
+#endif
 
 @main
 struct VVindowsConnectApp: App {
@@ -12,7 +14,9 @@ struct VVindowsConnectApp: App {
         WindowGroup(id: "desktop") { DesktopView(desktop: desktop) }
             .defaultSize(width: 1600, height: 900)
             .windowResizability(.contentSize)
+        #if !targetEnvironment(simulator)
         ImmersiveSpace(foveatedStreaming: connection.session)
             .immersionStyle(selection: .constant(.progressive), in: .progressive)
+        #endif
     }
 }
