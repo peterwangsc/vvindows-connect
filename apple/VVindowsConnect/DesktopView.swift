@@ -1,3 +1,4 @@
+import RealityKit
 import SwiftUI
 
 struct DesktopView: View {
@@ -35,7 +36,7 @@ struct DesktopView: View {
             #endif
             desktop.reopening = false
             desktop.desktopWindows += 1
-            if desktop.state == .idle { return toHome() }
+            if desktop.state == .idle { return openWindow(id: "home") }
             dismissWindow(id: "home")
         }
         .onDisappear {
@@ -81,15 +82,35 @@ struct DesktopView: View {
     }
 }
 
-struct ImmersiveExit: View {
+struct ImmersiveContent: View {
+    let connection: Connection
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
-        Color.clear.onDisappear {
+        RealityView { content in
+            var material = UnlitMaterial(color: .clear)
+            material.blending = .transparent(opacity: .init(floatLiteral: 0))
+            let shell = ModelEntity(mesh: .generateSphere(radius: 3), materials: [material])
+            shell.components.set(InputTargetComponent())
+            shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
+            content.add(shell)
+        }
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in toggleDoor() })
+        .onAppear {
+            #if targetEnvironment(simulator)
+            SimulatorScript.actions["door"] = { toggleDoor() }
+            #endif
+        }
+        .onDisappear {
             desktop.leaveImmersive()
             desktop.reopening = true
             openWindow(id: "desktop")
         }
+    }
+
+    private func toggleDoor() {
+        if connection.homeWindows > 0 { dismissWindow(id: "home") } else { openWindow(id: "home") }
     }
 }

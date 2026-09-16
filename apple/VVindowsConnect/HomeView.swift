@@ -19,11 +19,21 @@ struct HomeView: View {
             .padding(32)
             .navigationTitle("vindOS")
             .onAppear {
+                #if targetEnvironment(simulator)
+                SimulatorScript.actions["closehome"] = { dismissWindow(id: "home") }
+                #endif
                 connection.homeWindows += 1
                 if connection.homeWindows > 1 { return dismissWindow() }
                 if desktop.desktopWindows > 0, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
+            .onChange(of: desktop.session.status) { _, status in
+                guard status == .connected, desktop.immersion == .on else { return }
+                Task {
+                    try? await Task.sleep(for: .seconds(1))
+                    if desktop.immersion == .on { dismissWindow(id: "home") }
+                }
+            }
             .task {
                 #if targetEnvironment(simulator)
                 SimulatorScript.run(connection, desktop, connect: { connection.pair.map(connect) }, disconnect: desktop.disconnect)
