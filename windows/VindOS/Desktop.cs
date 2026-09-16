@@ -21,6 +21,7 @@ sealed class Desktop : IDisposable
     [DllImport("VindOS.Xr.dll")] static extern int vindos_desktop_start(uint fps, uint bitrate, FrameFn onFrame, EventFn onEvent);
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_idr();
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_stop();
+    [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_rect(out int left, out int top, out int right, out int bottom);
 
     public event Action<string>? StatusChanged;
 
@@ -106,24 +107,39 @@ sealed class Desktop : IDisposable
             vindos_desktop_idr();
             var (w, h) = await size.Task.WaitAsync(TimeSpan.FromSeconds(5), _cts.Token);
             await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "stream", width = w, height = h, fps = Fps }));
+            Log.Write($"desktop stream sent {w}x{h}");
             StatusChanged?.Invoke("Vision Pro is viewing this desktop.");
+            long sent = 0;
+            var lastReport = Environment.TickCount64;
+            vindos_desktop_rect(out var left, out var top, out var right, out var bottom);
+            var input = new Input(left, top, right - left, bottom - top);
             var reader = Task.Run(async () =>
             {
-                while (true)
+                try
                 {
-                    var (k, p) = await ReadAsync(ssl);
-                    if (k != 1) continue;
-                    using var doc = JsonDocument.Parse(p);
-                    var type = doc.RootElement.GetProperty("type").GetString();
-                    if (type == "keyframe") vindos_desktop_idr();
-                    else if (type == "bye") return;
+                    while (true)
+                    {
+                        var (k, p) = await ReadAsync(ssl);
+                        if (k == 2) { input.Apply(p); continue; }
+                        if (k != 1) continue;
+                        using var doc = JsonDocument.Parse(p);
+                        var type = doc.RootElement.GetProperty("type").GetString();
+                        Log.Write($"desktop control {type} after {sent} frames");
+                        if (type == "keyframe") vindos_desktop_idr();
+                        else if (type == "bye") return;
+                    }
                 }
+                catch (Exception e) { Log.Write($"desktop read end {e.GetType().Name} {e.Message} after {sent} frames"); }
+                finally { input.ReleaseAll(); }
             });
             await foreach (var frame in frames.Reader.ReadAllAsync(_cts.Token))
             {
                 if (reader.IsCompleted) break;
                 await ssl.WriteAsync(frame, _cts.Token);
+                sent++;
+                if (Environment.TickCount64 - lastReport >= 1000) { lastReport = Environment.TickCount64; Log.Write($"desktop frames={sent}"); }
             }
+            Log.Write($"desktop session end after {sent} frames");
         }
         catch (Exception e) when (e is IOException or EndOfStreamException or InvalidDataException or AuthenticationException or OperationCanceledException or TimeoutException or JsonException or KeyNotFoundException)
         {
