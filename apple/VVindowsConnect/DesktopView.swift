@@ -85,6 +85,8 @@ struct ImmersiveContent: View {
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
     @State private var hudShown = false
+    @State private var head: Entity?
+    @State private var hud: Entity?
 
     var body: some View {
         RealityView { content, attachments in
@@ -94,17 +96,19 @@ struct ImmersiveContent: View {
             shell.name = "shell"
             shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
             content.add(shell)
-            let head = AnchorEntity(.head)
-            if let hud = attachments.entity(for: "hud") {
-                hud.position = [0, -0.32, -0.75]
-                head.addChild(hud)
+            let headAnchor = AnchorEntity(.head)
+            content.add(headAnchor)
+            if let panel = attachments.entity(for: "hud") {
+                panel.isEnabled = false
+                content.add(panel)
+                hud = panel
             }
-            content.add(head)
-        } update: { content, attachments in
+            head = headAnchor
+        } update: { content, _ in
             if let shell = content.entities.first(where: { $0.name == "shell" }) {
                 if hudShown { shell.components.remove(InputTargetComponent.self) } else { shell.components.set(InputTargetComponent()) }
             }
-            attachments.entity(for: "hud")?.isEnabled = hudShown
+            hud?.isEnabled = hudShown
         } attachments: {
             Attachment(id: "hud") {
                 VStack(spacing: 12) {
@@ -120,10 +124,10 @@ struct ImmersiveContent: View {
                 .glassBackgroundEffect()
             }
         }
-        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in hudShown = true })
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in show() })
         .onAppear {
             #if targetEnvironment(simulator)
-            SimulatorScript.actions["door"] = { hudShown.toggle() }
+            SimulatorScript.actions["door"] = { if hudShown { hudShown = false } else { show() } }
             #endif
         }
         .onDisappear {
@@ -131,6 +135,20 @@ struct ImmersiveContent: View {
             desktop.reopening = true
             openWindow(id: "desktop")
         }
+    }
+
+    private func show() {
+        if let head, let hud {
+            let eye = head.position(relativeTo: nil)
+            var forward = head.orientation(relativeTo: nil).act([0, 0, -1])
+            forward.y = 0
+            if simd_length(forward) < 0.01 { forward = [0, 0, -1] }
+            forward = simd_normalize(forward)
+            let spot = eye + forward * 0.9 + SIMD3<Float>(0, -0.45, 0)
+            hud.look(at: SIMD3<Float>(eye.x, spot.y, eye.z), from: spot, relativeTo: nil)
+            hud.orientation *= simd_quatf(angle: .pi, axis: [0, 1, 0])
+        }
+        hudShown = true
     }
 
     private var status: String {
