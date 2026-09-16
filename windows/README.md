@@ -89,3 +89,24 @@ up.
 
 Verified on hardware 2026-09-16: click, drag and virtual-keyboard text in
 Notepad. Wheel and physical-keyboard records still pending a headset run.
+
+## Immersive (WIRE.md v4)
+
+`immersive` on the desktop stream stops the window encoder (Windows allows
+one Desktop Duplication per output per process), starts the CloudXR service
+and the host's own OpenXR session in desktop-quad mode, and replies
+`immersive{port}` with the Apple session-management port. `xr.cpp` copies the
+latest captured frame into a quad swapchain every rendered frame and submits
+it as a world-locked XR_COMPOSITION_LAYER_QUAD, 2.4 m wide at 2.0 m, behind a
+black projection layer. The headset then connects its Foveated Streaming
+session with the saved ClientID; Apple skips the QR and the host sends no
+`paired`. `windowed` from either side, or the Apple session ending, tears the
+session down, restarts the encoder with an IDR and replies `windowed`; the
+service stop runs on a background thread so the reply lands within ~300 ms.
+The two teardown triggers arrive within milliseconds of each other and are
+serialized by one lifecycle semaphore.
+
+Verified on hardware 2026-09-16: ten entries, each CONNECTED about 2.4 s after
+Fullscreen with no QR; return in 270 ms with the desktop stream intact; the
+desktop is visible on the quad. CloudXR media is not encrypted by the vendor;
+only its signaling and the desktop stream are.
