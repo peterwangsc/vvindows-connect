@@ -99,7 +99,7 @@ struct ImmersiveContent: View {
             content.add(shell)
             if let panel = attachments.entity(for: "hud") {
                 panel.isEnabled = false
-                panel.position = [0, -0.2, -0.4]
+                panel.position = [0, -0.25, -0.5]
                 hud = panel
             }
         } update: { content, _ in
@@ -129,6 +129,8 @@ struct ImmersiveContent: View {
                 .controlSize(.large)
                 .padding(20)
                 .glassBackgroundEffect()
+                .frame(width: 2400, height: 1400)
+                .contentShape(Rectangle())
                 .onTapGesture { hudShown = false }
             }
         }
