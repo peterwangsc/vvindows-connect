@@ -93,6 +93,7 @@ struct ImmersiveContent: View {
             var material = UnlitMaterial(color: .clear)
             material.blending = .transparent(opacity: .init(floatLiteral: 0))
             let shell = ModelEntity(mesh: .generateSphere(radius: 30), materials: [material])
+            shell.name = "shell"
             shell.components.set(InputTargetComponent())
             shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 30)]))
             content.add(shell)
@@ -127,7 +128,7 @@ struct ImmersiveContent: View {
                 .glassBackgroundEffect()
             }
         }
-        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in hudShown.toggle() })
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { value in if value.entity.name == "shell" { hudShown.toggle() } })
         .onAppear {
             #if targetEnvironment(simulator)
             SimulatorScript.actions["door"] = { hudShown.toggle() }
