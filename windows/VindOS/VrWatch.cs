@@ -17,7 +17,7 @@ sealed class VrWatch : IDisposable
     static readonly HashSet<string> Ignored = new(StringComparer.OrdinalIgnoreCase) { "steam", "steamwebhelper", "steamservice", "vrmonitor", "vrserver", "vrcompositor" };
 
     readonly int _self = Environment.ProcessId;
-    readonly Timer _timer;
+    readonly System.Threading.Timer _timer;
     readonly HashSet<int> _seen = [];
     int _pid, _busy, _tick;
     string _id = "";
@@ -25,7 +25,7 @@ sealed class VrWatch : IDisposable
 
     public int Pid => _pid;
 
-    public VrWatch() => _timer = new Timer(Tick, null, 0, 500);
+    public VrWatch() => _timer = new System.Threading.Timer(Tick, null, 0, 500);
 
     void Tick(object? _)
     {
