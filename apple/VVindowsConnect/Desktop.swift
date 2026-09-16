@@ -171,9 +171,10 @@ final class Desktop {
     }
 
     private func report() {
-        guard let best = clock.min(by: { $0.rtt < $1.rtt }), !samples.isEmpty else { return }
+        guard let best = clock.min(by: { $0.rtt < $1.rtt }) else { return }
         let sorted = samples.sorted()
-        let p50 = Double(sorted[sorted.count / 2]) / 1000, p95 = Double(sorted[min(sorted.count - 1, sorted.count * 95 / 100)]) / 1000
+        let p50 = sorted.isEmpty ? 0 : Double(sorted[sorted.count / 2]) / 1000
+        let p95 = sorted.isEmpty ? 0 : Double(sorted[min(sorted.count - 1, sorted.count * 95 / 100)]) / 1000
         latency = String(format: "%.0f/%.0f ms rtt %.1f", p50, p95, Double(best.rtt) / 1000)
         connection?.send(content: Frame.control(["v": 1, "type": "latency", "p50": p50, "p95": p95, "rtt": Double(best.rtt) / 1000, "frames": samples.count, "dropped": dropped]), completion: .idempotent)
         samples.removeAll()
