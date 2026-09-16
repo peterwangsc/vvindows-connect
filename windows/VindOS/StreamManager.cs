@@ -87,17 +87,32 @@ sealed class StreamManager : IDisposable
 
     public async Task StartServiceAsync(CancellationToken ct)
     {
-        Check(nv_rpc_client_start_cxr_service(_client, RuntimeVersion, (nuint)RuntimeVersion.Length));
-        _serviceRunning = true;
-        while (!RuntimeRunning()) await Task.Delay(100, ct);
+        await _gate.WaitAsync(ct);
+        try
+        {
+            if (_serviceRunning && RuntimeRunning()) return;
+            var r = nv_rpc_client_start_cxr_service(_client, RuntimeVersion, (nuint)RuntimeVersion.Length);
+            _serviceRunning = true;
+            if (r != 0) { nv_rpc_client_stop_cxr_service(_client); _serviceRunning = false; Check(r); }
+            while (!RuntimeRunning()) await Task.Delay(100, ct);
+        }
+        finally { _gate.Release(); }
     }
 
     public void StopService()
     {
-        if (!_serviceRunning) return;
-        _serviceRunning = false;
-        nv_rpc_client_stop_cxr_service(_client);
+        _gate.Wait();
+        try
+        {
+            if (!_serviceRunning && !RuntimeRunning()) return;
+            _serviceRunning = false;
+            var r = nv_rpc_client_stop_cxr_service(_client);
+            if (r != 0) Log.Write($"runtime stop failed {r}");
+        }
+        finally { _gate.Release(); }
     }
+
+    readonly SemaphoreSlim _gate = new(1, 1);
 
     public bool RuntimeRunning() => nv_rpc_client_get_cxr_service_status(_client, out var s) == 0 && s.RuntimeRunning;
 
