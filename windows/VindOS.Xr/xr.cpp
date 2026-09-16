@@ -175,7 +175,7 @@ static void run(std::wstring runtimeJson, std::string paired, float quadWidth, f
 			uint32_t cnt = 0; xrLocateViews(sess, &li, &vs, vc, &cnt, views.data());
 			if (quadMode && cnt > 0 && (vs.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT)) {
 				if (visibleSince == std::chrono::steady_clock::time_point{}) visibleSince = std::chrono::steady_clock::now();
-				bool due = !quadPlaced && std::chrono::steady_clock::now() - visibleSince > std::chrono::milliseconds(1500);
+				bool due = !quadPlaced && std::chrono::steady_clock::now() - visibleSince > std::chrono::milliseconds(0);
 				if (due || g_recenter.exchange(false)) {
 					XrVector3f head = { 0, 0, 0 }; for (uint32_t i = 0; i < cnt; i++) { head.x += views[i].pose.position.x / cnt; head.y += views[i].pose.position.y / cnt; head.z += views[i].pose.position.z / cnt; }
 					XrQuaternionf q = views[0].pose.orientation;
