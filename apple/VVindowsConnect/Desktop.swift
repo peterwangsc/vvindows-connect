@@ -31,6 +31,10 @@ final class Desktop {
         connection?.send(content: Frame.control(["v": 1, "type": "immersive"]), completion: .idempotent)
     }
 
+    func immersiveConnected() {
+        if immersion == .starting { immersion = .on }
+    }
+
     func leaveImmersive() {
         guard immersion != .off else { return }
         immersion = .off
@@ -138,10 +142,7 @@ final class Desktop {
             case "immersive":
                 guard immersion == .starting, let host = hostAddress, let port = (json["port"] as? Int).flatMap({ NWEndpoint.Port(rawValue: UInt16($0)) }) else { return leaveImmersive() }
                 Task {
-                    do {
-                        try await session.connect(endpoint: .local(ipAddress: host, port: port))
-                        if immersion == .starting { immersion = .on }
-                    } catch { leaveImmersive() }
+                    do { try await session.connect(endpoint: .local(ipAddress: host, port: port)) } catch { leaveImmersive() }
                 }
             case "windowed": if immersion == .on { leaveImmersive() }
             case "bye": disconnect()
