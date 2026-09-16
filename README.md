@@ -31,7 +31,10 @@ Platform-owned permission UI remains platform-owned.
 **Soft v0.** vindOS 0.1.0 (1) for Vision Pro is uploaded to App Store Connect
 for TestFlight. The Windows installer (per-user, unsigned, ships no NVIDIA
 files; the app imports the CloudXR Runtime and Stream Manager archives the user
-downloads from NGC) is built from `windows/`.
+downloads from NGC) is built from `windows/` and published at
+https://cdn.golfcore.app/public/static/vindos/vindOS-0.1.0-setup.exe. The
+product site is https://peterwang.tech/vindos (download, support, privacy,
+license; `/spatial-pc` redirects there).
 
 Verified on hardware on 2026-09-16:
 
