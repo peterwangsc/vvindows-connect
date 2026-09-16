@@ -93,14 +93,17 @@ struct ImmersiveContent: View {
             var material = UnlitMaterial(color: .clear)
             material.blending = .transparent(opacity: .init(floatLiteral: 0))
             let shell = ModelEntity(mesh: .generateSphere(radius: 3), materials: [material])
-            shell.components.set(InputTargetComponent())
+            shell.name = "shell"
             shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
             content.add(shell)
+        } update: { content in
+            guard let shell = content.entities.first(where: { $0.name == "shell" }) else { return }
+            if connection.homeWindows == 0 { shell.components.set(InputTargetComponent()) } else { shell.components.remove(InputTargetComponent.self) }
         }
-        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in toggleDoor() })
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in if connection.homeWindows == 0 { openWindow(id: "home") } })
         .onAppear {
             #if targetEnvironment(simulator)
-            SimulatorScript.actions["door"] = { toggleDoor() }
+            SimulatorScript.actions["door"] = { if connection.homeWindows > 0 { dismissWindow(id: "home") } else { openWindow(id: "home") } }
             #endif
         }
         .onDisappear {
@@ -110,7 +113,4 @@ struct ImmersiveContent: View {
         }
     }
 
-    private func toggleDoor() {
-        if connection.homeWindows > 0 { dismissWindow(id: "home") } else { openWindow(id: "home") }
-    }
 }
