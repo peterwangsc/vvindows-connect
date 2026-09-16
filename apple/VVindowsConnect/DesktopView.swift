@@ -103,6 +103,9 @@ struct ImmersiveContent: View {
                 hud = panel
             }
         } update: { content, _ in
+            if let shell = content.entities.first(where: { $0.name == "shell" }) {
+                if hudShown { shell.components.remove(InputTargetComponent.self) } else { shell.components.set(InputTargetComponent()) }
+            }
             if hudShown, let hud, mount == nil {
                 let anchor = AnchorEntity(.head, trackingMode: .once)
                 anchor.addChild(hud)
@@ -126,6 +129,7 @@ struct ImmersiveContent: View {
                 .controlSize(.large)
                 .padding(20)
                 .glassBackgroundEffect()
+                .onTapGesture { hudShown = false }
             }
         }
         .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { value in if value.entity.name == "shell" { hudShown.toggle() } })
