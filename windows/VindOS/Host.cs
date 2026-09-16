@@ -228,6 +228,7 @@ sealed class Host : IDisposable
             var game = _game;
             game.Exited += code => _ = OnGameExitedAsync(game, code);
             game.VrLoaded += module => _ = YieldQuadAsync(game);
+            game.VrEnded += () => _ = RestoreQuadAsync(game);
             GameChanged?.Invoke(entry);
             StatusChanged?.Invoke(immersive ? $"{entry.Name} is running in Immersive Mode." : $"{entry.Name} is running on the desktop.");
             _ = Task.Delay(TimeSpan.FromSeconds(8), _cts.Token).ContinueWith(_ => Log.Write($"foreground after game start: {Game.Foreground()}"), TaskContinuationOptions.OnlyOnRanToCompletion);
@@ -238,6 +239,18 @@ sealed class Host : IDisposable
     }
 
     public void StopGame() => _game?.Stop();
+
+    async Task RestoreQuadAsync(Game game)
+    {
+        await _lifecycle.WaitAsync(_cts.Token);
+        try
+        {
+            if (!ReferenceEquals(_game, game) || !_immersive || _xr is not null) return;
+            var error = await StartXrAsync(null, true);
+            Log.Write(error is null ? $"quad restored while {game.Entry.Id} launcher runs" : $"quad restart failed {error}");
+        }
+        finally { _lifecycle.Release(); }
+    }
 
     async Task YieldQuadAsync(Game game)
     {

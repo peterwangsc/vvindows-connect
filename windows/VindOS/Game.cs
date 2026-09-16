@@ -77,7 +77,8 @@ sealed class Game : IDisposable
     public bool Immersive { get; }
     public event Action<int>? Exited;
     public event Action<string>? VrLoaded;
-    bool _vr;
+    public event Action? VrEnded;
+    int _vrPid;
 
     public Game(GameEntry entry, bool immersive)
     {
@@ -98,7 +99,8 @@ sealed class Game : IDisposable
         _watch = new Timer(_ =>
         {
             if (!Running) { _watch!.Dispose(); var code = _process.HasExited ? _process.ExitCode : 0; Log.Write($"game {entry.Id} exited {code}"); Exited?.Invoke(code); return; }
-            if (!_vr && VrModule() is { } module) { _vr = true; Log.Write($"game {entry.Id} loaded {module}"); VrLoaded?.Invoke(module); }
+            if (_vrPid == 0) { if (VrModule() is var (module, pid) && pid != 0) { _vrPid = pid; Log.Write($"game {entry.Id} loaded {module}"); VrLoaded?.Invoke(module); } }
+            else if (!InJob((uint)_vrPid)) { Log.Write($"game {entry.Id} vr process {_vrPid} ended"); _vrPid = 0; VrEnded?.Invoke(); }
         }, null, 250, 250);
     }
 
@@ -113,7 +115,7 @@ sealed class Game : IDisposable
         return $"class={name} process={process}";
     }
 
-    string? VrModule()
+    (string, int) VrModule()
     {
         foreach (var p in Process.GetProcesses())
         {
@@ -124,12 +126,12 @@ sealed class Game : IDisposable
                 {
                     foreach (ProcessModule m in p.Modules)
                         if (m.ModuleName.Equals("openxr_loader.dll", StringComparison.OrdinalIgnoreCase) || m.ModuleName.Equals("openvr_api.dll", StringComparison.OrdinalIgnoreCase))
-                            return $"{m.ModuleName} in {p.ProcessName} pid {p.Id}";
+                            return ($"{m.ModuleName} in {p.ProcessName} pid {p.Id}", p.Id);
                 }
                 catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { }
             }
         }
-        return null;
+        return ("", 0);
     }
 
     bool InJob(uint pid)
