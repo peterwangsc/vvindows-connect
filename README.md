@@ -45,7 +45,15 @@ Verified on hardware on 2026-09-16:
 - Immersive: Fullscreen shows the desktop on a large screen in an immersive
   space using the saved pair, no second scan. The Crown dials the
   surroundings. Windowed, Apple's Exit, the Crown and the Home gesture all
-  return to the live desktop window.
+  return to the live desktop window. A pinch on the surroundings shows or
+  hides the control panel.
+- Games: Play launches Assetto Corsa inside the same session; the cockpit
+  renders on the headset and Recenter fixes the seat height.
 
-Not yet verified: any latency figure. The simulator build stubs the Apple
+Not yet verified: driving input. Mac Virtual Display is hidden while an
+immersive space is open, so the MacBook keyboard cannot reach the headset in
+Fullscreen; a controller on the PC or a Bluetooth keyboard paired to the
+headset is required, and neither was available on 2026-09-16.
+
+Also not yet verified: any latency figure. The simulator build stubs the Apple
 streaming session and is for UI checks only; it is not a hardware result.
