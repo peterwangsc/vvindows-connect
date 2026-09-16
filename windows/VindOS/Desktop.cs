@@ -24,6 +24,8 @@ sealed class Desktop : IDisposable
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_rect(out int left, out int top, out int right, out int bottom);
 
     public event Action<string>? StatusChanged;
+    public Func<Task<string?>>? ImmersiveRequested;
+    public Func<Task>? DesktopRequested;
 
     readonly X509Certificate2 _certificate;
     readonly TcpListener _listener;
@@ -125,12 +127,30 @@ sealed class Desktop : IDisposable
                         using var doc = JsonDocument.Parse(p);
                         var type = doc.RootElement.GetProperty("type").GetString();
                         Log.Write($"desktop control {type} after {sent} frames");
-                        if (type == "keyframe") vindos_desktop_idr();
-                        else if (type == "bye") return;
+                        switch (type)
+                        {
+                            case "keyframe": vindos_desktop_idr(); break;
+                            case "bye": return;
+                            case "immersive":
+                                if (!_immersive) { _immersive = true; lock (_gate) StopCapture(); }
+                                var reason = ImmersiveRequested is null ? "unsupported" : await ImmersiveRequested();
+                                if (reason is null) await WriteAsync(ssl, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "immersive", port = ApplePort }));
+                                else { Log.Write($"immersive failed {reason}"); await EndImmersiveAsync(); }
+                                break;
+                            case "windowed":
+                                if (DesktopRequested is not null) await DesktopRequested();
+                                await EndImmersiveAsync();
+                                break;
+                        }
                     }
                 }
                 catch (Exception e) { Log.Write($"desktop read end {e.GetType().Name} {e.Message} after {sent} frames"); }
-                finally { input.ReleaseAll(); Log.Write($"desktop input {input.Summary}"); }
+                finally
+                {
+                    input.ReleaseAll();
+                    Log.Write($"desktop input {input.Summary}");
+                    if (_immersive) { _immersive = false; if (DesktopRequested is not null) await DesktopRequested(); }
+                }
             });
             await foreach (var frame in frames.Reader.ReadAllAsync(_cts.Token))
             {
@@ -177,6 +197,30 @@ sealed class Desktop : IDisposable
         _capturing = false;
         vindos_desktop_stop();
     }
+
+    void StartCapture()
+    {
+        if (_capturing || _stream is null) return;
+        _capturing = true;
+        vindos_desktop_start(Fps, Bitrate, _onFrame, _onEvent);
+    }
+
+    public async Task EndImmersiveAsync()
+    {
+        SslStream? stream;
+        lock (_gate)
+        {
+            if (!_immersive) return;
+            _immersive = false;
+            StartCapture();
+            stream = _stream;
+        }
+        vindos_desktop_idr();
+        if (stream is not null) try { await WriteAsync(stream, 1, JsonSerializer.SerializeToUtf8Bytes(new { v = 1, type = "windowed" })); } catch (Exception e) { Log.Write($"windowed send failed {e.Message}"); }
+    }
+
+    public int ApplePort { get; set; }
+    volatile bool _immersive;
 
     public void Disconnect()
     {
