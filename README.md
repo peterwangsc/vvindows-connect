@@ -28,13 +28,17 @@ Platform-owned permission UI remains platform-owned.
 
 ## Current milestone
 
-**Pair once through the actual apps, persist the connection, and reopen it.**
+**Windowed desktop: authenticated connection, one video path, display,
+disconnect and reconnect.**
 
-This initial commit contains the design and repository structure only. There
-is no application implementation or working-feature claim yet. Before moving
-to desktop streaming, the real app flow must finish pairing, survive restart,
-and forget the connection correctly. A simulator result is not an Apple
-system-framework hardware result.
+Milestone 1 was verified on hardware on 2026-09-16: Pair on Windows, Pair on
+Vision Pro, select the PC, scan the QR once, no PC click. The headset stored
+the pair, showed it again after relaunch, and Forget cleared it on both sides.
+The host log showed WAITING to `paired` delivered in under three seconds.
 
-Windowed desktop, keyboard/mouse, and immersive PC games follow in that order,
-through the same applications. Each step must leave a usable product.
+Not yet verified: reconnecting without a second scan. That needs the Connect
+action, which arrives with the windowed desktop. A simulator result is not an
+Apple system-framework hardware result.
+
+Keyboard/mouse and immersive PC games follow, through the same applications.
+Each step must leave a usable product.
