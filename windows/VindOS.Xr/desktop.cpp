@@ -155,6 +155,5 @@ extern "C" __declspec(dllexport) int32_t vindos_desktop_start(uint32_t fps, uint
 	return 0;
 }
 extern "C" __declspec(dllexport) void vindos_desktop_idr() { d_idr = true; }
-extern "C" __declspec(dllexport) int64_t vindos_desktop_now_us() { LARGE_INTEGER now; QueryPerformanceCounter(&now); return d_freq ? (now.QuadPart - d_epoch.load()) * 1000000 / d_freq : -1; }
 extern "C" __declspec(dllexport) void vindos_desktop_rect(int32_t* left, int32_t* top, int32_t* right, int32_t* bottom) { *left = d_rect.left; *top = d_rect.top; *right = d_rect.right; *bottom = d_rect.bottom; }
 extern "C" __declspec(dllexport) void vindos_desktop_stop() { std::lock_guard<std::mutex> lock(d_lifecycle); d_quit = true; if (d_thread.joinable()) d_thread.join(); }

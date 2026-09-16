@@ -21,7 +21,6 @@ sealed class Desktop : IDisposable
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_idr();
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_stop();
     [DllImport("VindOS.Xr.dll")] static extern void vindos_desktop_rect(out int left, out int top, out int right, out int bottom);
-    [DllImport("VindOS.Xr.dll")] static extern long vindos_desktop_now_us();
 
     public event Action<string>? StatusChanged;
     public Func<Task<string?>>? ImmersiveRequested;
@@ -126,7 +125,6 @@ sealed class Desktop : IDisposable
             StatusChanged?.Invoke("Vision Pro is viewing this desktop.");
             long sent = 0;
             var lastReport = Environment.TickCount64;
-            var sendDelays = new List<long>(128);
             vindos_desktop_rect(out var left, out var top, out var right, out var bottom);
             var input = new Input(left, top, right - left, bottom - top);
             var reader = Task.Run(async () =>
@@ -140,7 +138,7 @@ sealed class Desktop : IDisposable
                         if (k != 1) continue;
                         using var doc = JsonDocument.Parse(p);
                         var type = doc.RootElement.GetProperty("type").GetString();
-                        if (type != "clock") Log.Write($"desktop control {type} after {sent} frames");
+                        Log.Write($"desktop control {type} after {sent} frames");
                         switch (type)
                         {
                             case "keyframe": vindos_desktop_idr(); break;
@@ -154,12 +152,6 @@ sealed class Desktop : IDisposable
                             case "windowed":
                                 if (DesktopRequested is not null) await DesktopRequested();
                                 await EndImmersiveAsync();
-                                break;
-                            case "clock":
-                                Send(new { v = 1, type = "clock", t1 = doc.RootElement.GetProperty("t1").GetInt64(), t2 = vindos_desktop_now_us() });
-                                break;
-                            case "latency":
-                                Log.Write($"headset latency {doc.RootElement.GetRawText()}");
                                 break;
                             case "recenter":
                                 Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "applied" : "ignored: nothing to recenter")}");
@@ -192,14 +184,7 @@ sealed class Desktop : IDisposable
                 if (bytes is null) continue;
                 await ssl.WriteAsync(bytes, _cts.Token);
                 sent++;
-                if ((bytes[13] & 2) == 0) sendDelays.Add(vindos_desktop_now_us() - BinaryPrimitives.ReadInt64LittleEndian(bytes.AsSpan(5)));
-                if (Environment.TickCount64 - lastReport >= 1000 && sendDelays.Count > 0)
-                {
-                    lastReport = Environment.TickCount64;
-                    sendDelays.Sort();
-                    Log.Write($"desktop frames={sent} captureToSend p50={sendDelays[sendDelays.Count / 2] / 1000.0:F1}ms p95={sendDelays[(int)(sendDelays.Count * 0.95)] / 1000.0:F1}ms n={sendDelays.Count} {input.Summary}");
-                    sendDelays.Clear();
-                }
+                if (Environment.TickCount64 - lastReport >= 1000) { lastReport = Environment.TickCount64; Log.Write($"desktop frames={sent} {input.Summary}"); }
             }
             await reader;
             Log.Write($"desktop session end after {sent} frames");
