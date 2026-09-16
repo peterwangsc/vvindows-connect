@@ -162,9 +162,11 @@ final class Desktop {
         ticker = Task {
             var tick = 0
             while !Task.isCancelled {
-                connection?.send(content: Frame.control(["v": 1, "type": "clock", "t1": Self.now]), completion: .idempotent)
-                tick += 1
-                if tick % 3 == 0 { report() }
+                if immersion == .off {
+                    connection?.send(content: Frame.control(["v": 1, "type": "clock", "t1": Self.now]), completion: .idempotent)
+                    tick += 1
+                    if tick % 3 == 0 { report() }
+                }
                 try? await Task.sleep(for: .seconds(2))
             }
         }
@@ -188,7 +190,7 @@ final class Desktop {
             let captured = Int64(bitPattern: body.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }.littleEndian)
             let flags = body[body.startIndex + 8]
             let enqueued = video.enqueue(annexB: body.dropFirst(9), keyframe: flags & 1 == 1)
-            if !enqueued { dropped += 1 } else if flags & 2 == 0, let best = clock.min(by: { $0.rtt < $1.rtt }) {
+            if !enqueued { dropped += 1 } else if immersion == .off, flags & 2 == 0, let best = clock.min(by: { $0.rtt < $1.rtt }) {
                 let sample = Self.now - (captured + best.offset)
                 if (0...5_000_000).contains(sample) { samples.append(sample) }
             }
