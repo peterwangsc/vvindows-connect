@@ -85,30 +85,34 @@ struct ImmersiveContent: View {
     let desktop: Desktop
     @Environment(\.openWindow) private var openWindow
     @State private var hudShown = false
-    @State private var head: Entity?
     @State private var hud: Entity?
+    @State private var mount: Entity?
 
     var body: some View {
         RealityView { content, attachments in
             var material = UnlitMaterial(color: .clear)
             material.blending = .transparent(opacity: .init(floatLiteral: 0))
             let shell = ModelEntity(mesh: .generateSphere(radius: 3), materials: [material])
-            shell.name = "shell"
+            shell.components.set(InputTargetComponent())
             shell.components.set(CollisionComponent(shapes: [.generateSphere(radius: 3)]))
             content.add(shell)
-            let headAnchor = AnchorEntity(.head)
-            content.add(headAnchor)
             if let panel = attachments.entity(for: "hud") {
                 panel.isEnabled = false
-                content.add(panel)
+                panel.position = [0, -0.45, -0.9]
                 hud = panel
             }
-            head = headAnchor
         } update: { content, _ in
-            if let shell = content.entities.first(where: { $0.name == "shell" }) {
-                if hudShown { shell.components.remove(InputTargetComponent.self) } else { shell.components.set(InputTargetComponent()) }
+            if hudShown, let hud, mount == nil {
+                let anchor = AnchorEntity(.head, trackingMode: .once)
+                anchor.addChild(hud)
+                content.add(anchor)
+                hud.isEnabled = true
+                Task { @MainActor in mount = anchor }
+            } else if !hudShown, let mount {
+                hud?.isEnabled = false
+                content.remove(mount)
+                Task { @MainActor in self.mount = nil }
             }
-            hud?.isEnabled = hudShown
         } attachments: {
             Attachment(id: "hud") {
                 VStack(spacing: 12) {
@@ -116,7 +120,6 @@ struct ImmersiveContent: View {
                     HStack(spacing: 12) {
                         Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
                         Button("Windowed") { desktop.leaveImmersive() }
-                        Button("Hide") { hudShown = false }
                     }
                 }
                 .controlSize(.large)
@@ -124,10 +127,10 @@ struct ImmersiveContent: View {
                 .glassBackgroundEffect()
             }
         }
-        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in show() })
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { _ in hudShown.toggle() })
         .onAppear {
             #if targetEnvironment(simulator)
-            SimulatorScript.actions["door"] = { if hudShown { hudShown = false } else { show() } }
+            SimulatorScript.actions["door"] = { hudShown.toggle() }
             #endif
         }
         .onDisappear {
@@ -135,20 +138,6 @@ struct ImmersiveContent: View {
             desktop.reopening = true
             openWindow(id: "desktop")
         }
-    }
-
-    private func show() {
-        if let head, let hud {
-            let eye = head.position(relativeTo: nil)
-            var forward = head.orientation(relativeTo: nil).act([0, 0, -1])
-            forward.y = 0
-            if simd_length(forward) < 0.01 { forward = [0, 0, -1] }
-            forward = simd_normalize(forward)
-            let spot = eye + forward * 0.9 + SIMD3<Float>(0, -0.45, 0)
-            hud.look(at: SIMD3<Float>(eye.x, spot.y, eye.z), from: spot, relativeTo: nil)
-            hud.orientation *= simd_quatf(angle: .pi, axis: [0, 1, 0])
-        }
-        hudShown = true
     }
 
     private var status: String {
