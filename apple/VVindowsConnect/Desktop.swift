@@ -20,7 +20,6 @@ final class Desktop {
     private var hostAddress: (any IPAddress)?
     var desktopWindows = 0
     var reopening = false
-    private(set) var sent = [UInt8: Int]()
     let video = VideoStream()
     private var connection: NWConnection?
     private var browser: NWBrowser?
@@ -74,7 +73,6 @@ final class Desktop {
 
     func send(_ input: Input) {
         guard case .streaming = state else { return }
-        sent[input.record[0], default: 0] += 1
         connection?.send(content: Frame.input(input.record), completion: .idempotent)
     }
 
