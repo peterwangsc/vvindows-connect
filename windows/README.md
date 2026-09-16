@@ -211,5 +211,8 @@ next to the exe is used when the user folder is incomplete.
 Verified 2026-09-16: silent install, setup card shown, both ZIPs imported
 (`cloudxr import: Runtime (...), Stream Manager (...); installed=True`), host
 started with `NvStreamManager.exe` running from the user folder, pair intact.
-Unsigned: SmartScreen shows the unknown-publisher prompt until a certificate
-exists.
+Peter ruled on 2026-09-16 ("proceed as is"): CloudXR stays user-supplied,
+v0 ships unsigned, the product name is vindOS, and the installer shows
+`installer\LICENSE.txt` (the vindOS Pre-release License) on its license page.
+Unsigned means Windows SmartScreen shows "Windows protected your PC / Unknown
+publisher" on first run of the setup; More info → Run anyway continues.
