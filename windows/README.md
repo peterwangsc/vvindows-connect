@@ -71,3 +71,21 @@ when the link falls behind, the oldest frame is dropped and an IDR requested.
 Measured on this PC (RTX 4070, 1920x1080, animated window, loopback TLS):
 59.0 fps delivered, first frame an IDR with in-band SPS/PPS, wrong token
 refused before any video.
+
+## Input (WIRE.md v3)
+
+`Input.cs` applies the 16-byte INPUT records from the desktop connection with
+`SendInput`: moves and buttons map the normalized point onto the captured
+output's rectangle as absolute virtual-desktop coordinates, wheel units pass
+through, keys map USB HID usages to set-1 scan codes, text injects Unicode
+units. Every held button and key is released when the connection ends for
+any reason. A malformed record drops the connection.
+
+vindOS controls apps running as a normal user; windows running as
+administrator ignore its input (Windows UIPI, because vindOS itself must run
+non-elevated for the OpenXR runtime selection). An app launched from an
+elevated terminal inherits that elevation, which is the usual way this shows
+up.
+
+Verified on hardware 2026-09-16: click, drag and virtual-keyboard text in
+Notepad. Wheel and physical-keyboard records still pending a headset run.
