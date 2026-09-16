@@ -1,0 +1,155 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+		A000000000000000000000A1 /* VVindowsConnectApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VVindowsConnectApp.swift; sourceTree = "<group>"; };
+		A000000000000000000000A2 /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
+		A000000000000000000000A3 /* PairedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedMessage.swift; sourceTree = "<group>"; };
+		A000000000000000000000A4 /* SavedPair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPair.swift; sourceTree = "<group>"; };
+		A000000000000000000000A5 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A000000000000000000000A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A000000000000000000000A7 /* VVindowsConnect.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VVindowsConnect.entitlements; sourceTree = "<group>"; };
+		A000000000000000000000A8 /* VVindowsConnect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VVindowsConnect.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B000000000000000000000B1 = {isa = PBXBuildFile; fileRef = A000000000000000000000A1; };
+		B000000000000000000000B2 = {isa = PBXBuildFile; fileRef = A000000000000000000000A2; };
+		B000000000000000000000B3 = {isa = PBXBuildFile; fileRef = A000000000000000000000A3; };
+		B000000000000000000000B4 = {isa = PBXBuildFile; fileRef = A000000000000000000000A4; };
+		B000000000000000000000B5 = {isa = PBXBuildFile; fileRef = A000000000000000000000A5; };
+		C000000000000000000000C1 /* VVindowsConnect */ = {
+			isa = PBXGroup;
+			children = (A000000000000000000000A1, A000000000000000000000A2, A000000000000000000000A3, A000000000000000000000A4, A000000000000000000000A5, A000000000000000000000A6, A000000000000000000000A7);
+			path = VVindowsConnect;
+			sourceTree = "<group>";
+		};
+		C000000000000000000000C2 /* Products */ = {
+			isa = PBXGroup;
+			children = (A000000000000000000000A8);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C000000000000000000000C3 = {
+			isa = PBXGroup;
+			children = (C000000000000000000000C1, C000000000000000000000C2);
+			sourceTree = "<group>";
+		};
+		D000000000000000000000D1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B000000000000000000000B1, B000000000000000000000B2, B000000000000000000000B3, B000000000000000000000B4, B000000000000000000000B5);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D000000000000000000000D2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E000000000000000000000E1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				SDKROOT = xros;
+				SUPPORTED_PLATFORMS = xros;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		E000000000000000000000E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				SDKROOT = xros;
+				SUPPORTED_PLATFORMS = xros;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+		E000000000000000000000E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = VVindowsConnect/VVindowsConnect.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2Y27799A92;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VVindowsConnect/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = vindOS;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.golfcore.vvindowsconnect;
+				PRODUCT_NAME = VVindowsConnect;
+			};
+			name = Debug;
+		};
+		E000000000000000000000E4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = VVindowsConnect/VVindowsConnect.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2Y27799A92;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VVindowsConnect/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = vindOS;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.golfcore.vvindowsconnect;
+				PRODUCT_NAME = VVindowsConnect;
+			};
+			name = Release;
+		};
+		F000000000000000000000F1 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (E000000000000000000000E1, E000000000000000000000E2);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F000000000000000000000F2 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (E000000000000000000000E3, E000000000000000000000E4);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F000000000000000000000F3 /* VVindowsConnect */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F000000000000000000000F2;
+			buildPhases = (D000000000000000000000D1, D000000000000000000000D2);
+			buildRules = ();
+			dependencies = ();
+			name = VVindowsConnect;
+			productName = VVindowsConnect;
+			productReference = A000000000000000000000A8;
+			productType = "com.apple.product-type.application";
+		};
+		F000000000000000000000F4 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2650;
+			};
+			buildConfigurationList = F000000000000000000000F1;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = C000000000000000000000C3;
+			productRefGroup = C000000000000000000000C2;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (F000000000000000000000F3);
+		};
+	};
+	rootObject = F000000000000000000000F4;
+}
