@@ -251,6 +251,14 @@ sealed class Host : IDisposable
         }
         finally { _lifecycle.Release(); }
         await _desktop.GameStartedAsync(id);
+        var watch = _watch;
+        var started = Environment.TickCount64;
+        foreach (var at in new[] { 5, 20, 40 })
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(0, started + at * 1000 - Environment.TickCount64)), _cts.Token);
+            if (watch is null || !ReferenceEquals(_watch, watch) || watch.Pid == 0 || _xr is not null) return;
+            Log.Write($"auto recenter at +{at} s {(watch.Recenter() ? "sent" : "skipped, game not foreground")}");
+        }
     }
 
     async Task RestoreQuadAsync(string id)
