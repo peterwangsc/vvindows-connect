@@ -12,6 +12,7 @@ sealed class Host : IDisposable
     sealed record Session(string Id, string ClientId, string Token, string Fingerprint, string DesktopToken, bool Reconnect);
 
     public event Action<string>? StatusChanged;
+    void SetStatus(string s) { StatusText = s; StatusChanged?.Invoke(s); }
     public event Action<byte[]?>? QrChanged;
     public event Action<Pair?>? PairChanged;
     public event Action<bool>? ImmersiveChanged;
@@ -32,6 +33,7 @@ sealed class Host : IDisposable
     readonly SemaphoreSlim _lifecycle = new(1, 1);
 
     public Pair? Pair { get; private set; } = PairStore.LoadPair();
+    public string StatusText { get; private set; } = "";
     public string HostName => _bonjour.InstanceName;
     public IReadOnlyList<GameEntry> Games => _games;
     public bool Immersive => _immersive;
@@ -44,7 +46,7 @@ sealed class Host : IDisposable
         _identity = PairStore.Identity();
         _manager = new StreamManager();
         _desktop = new Desktop(_identity.DesktopPfx, _identity.DesktopPort, () => Pair?.TokenHash);
-        _desktop.StatusChanged += s => { if (s is null) Idle(); else StatusChanged?.Invoke(s); };
+        _desktop.StatusChanged += s => { if (s is null) Idle(); else SetStatus(s); };
         _desktop.ImmersiveRequested = BeginImmersiveAsync;
         _desktop.DesktopRequested = EndImmersiveAsync;
         _desktop.RecenterRequested = () => { if (_watch?.Recenter() == true) return true; if (_xr is null) return false; _xr.Recenter(); return true; };
@@ -52,7 +54,7 @@ sealed class Host : IDisposable
         _listener.Start();
         _desktop.ApplePort = ((IPEndPoint)_listener.LocalEndpoint).Port;
         _bonjour = new Bonjour((ushort)_desktop.ApplePort, _identity.ServerId, _identity.DesktopPort);
-        Log.Write($"listening {_listener.LocalEndpoint} as {HostName}, desktop port {_identity.DesktopPort}");
+        Log.Write($"vindOS {App.Version} listening {_listener.LocalEndpoint} as {HostName}, desktop port {_identity.DesktopPort}");
         _ = ListenAsync();
         Idle();
     }
@@ -79,16 +81,16 @@ sealed class Host : IDisposable
         return "Bridges removed; the games' original openvr_api.dll files are back.";
     }
 
-    public async Task<string> RestartSteamAsync()
+    public async Task<string?> RestartSteamAsync()
     {
         try { await Steam.RestartAsync(_cts.Token); } catch (Exception e) { Log.Write($"steam restart failed {e.Message}"); return e.Message; }
-        return "Steam restarted through vindOS.";
+        return null;
     }
 
     public void Arm()
     {
         _armed = true;
-        StatusChanged?.Invoke($"On Vision Pro, click Pair and choose {HostName}.");
+        SetStatus($"Pairing. On Vision Pro, click Pair and choose {HostName}.");
     }
 
     public void Cancel()
@@ -111,7 +113,7 @@ sealed class Host : IDisposable
     void Idle()
     {
         QrChanged?.Invoke(null);
-        StatusChanged?.Invoke(_desktop.Streaming ? "Vision Pro is viewing this desktop." : Pair is null ? "Not paired." : $"Paired since {Pair.PairedAt.LocalDateTime:g}.");
+        SetStatus(_desktop.Streaming ? "Vision Pro is viewing this desktop. Fullscreen on Vision Pro enters Immersive Mode." : Pair is null ? "Not paired. Click Pair here, then Pair on Vision Pro." : "Paired with Vision Pro. Click Connect on Vision Pro to view this desktop.");
     }
 
     async Task ListenAsync()
@@ -159,7 +161,7 @@ sealed class Host : IDisposable
                 await SendAsync(Wire.AcknowledgeBarcodePresentation(sessionId));
                 using (var gen = new QRCodeGenerator())
                     QrChanged?.Invoke(new PngByteQRCode(gen.CreateQrCode(Wire.Barcode(_session!.Token, _session.Fingerprint), QRCodeGenerator.ECCLevel.L)).GetGraphic(12));
-                StatusChanged?.Invoke("Scan this code with Vision Pro.");
+                SetStatus("Scan this code. Point Vision Pro at the code to finish pairing.");
                 break;
             case "SessionStatusDidChange":
                 var status = root.GetProperty("Status").GetString();
@@ -175,7 +177,7 @@ sealed class Host : IDisposable
                         _armed = false;
                         PairChanged?.Invoke(Pair);
                     }
-                    StatusChanged?.Invoke(_immersive ? "Vision Pro is in Immersive Mode." : "Vision Pro connected.");
+                    SetStatus(_immersive ? "Immersive Mode. Press Play in Steam on the big screen to start a VR game." : "Vision Pro connected.");
                 }
                 else if (status == Status.Disconnected) await EndSessionAsync();
                 break;
@@ -189,7 +191,7 @@ sealed class Host : IDisposable
         {
             if (_xr is null && _session is not null)
             {
-                StatusChanged?.Invoke("Starting session…");
+                SetStatus("Starting session…");
                 var paired = _session.Reconnect ? null : Wire.Paired(_identity.ServerId, HostName, _desktop.Fingerprint, _session.DesktopToken);
                 var error = await StartXrAsync(paired, false);
                 if (error is not null) Log.Write($"xr start failed {error}");
@@ -210,7 +212,7 @@ sealed class Host : IDisposable
             if (kind == XrSession.Kind.Stage && value == XrSession.StageLoop) ready.TrySetResult(null);
             if (kind == XrSession.Kind.Error) ready.TrySetResult($"openxr {value}");
             if (kind == XrSession.Kind.Exit) ready.TrySetResult("openxr exited");
-            if (kind == XrSession.Kind.Sent) StatusChanged?.Invoke("Paired. Vision Pro is saving the connection.");
+            if (kind == XrSession.Kind.Sent) SetStatus("Paired. Vision Pro is saving the connection.");
         });
         var result = await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(quad ? 20 : 5), _cts.Token)) == ready.Task ? ready.Task.Result : quad ? "openxr timeout" : null;
         if (result is not null) { _xr.Dispose(); _xr = null; _manager.StopService(); }
@@ -231,7 +233,7 @@ sealed class Host : IDisposable
                 _watch.Started += (pid, name, id) => _ = YieldQuadAsync(id);
                 _watch.Ended += (pid, id) => _ = RestoreQuadAsync(id);
                 ImmersiveChanged?.Invoke(true);
-                StatusChanged?.Invoke("Immersive Mode ready. Waiting for Vision Pro.");
+                SetStatus("Entering Immersive Mode. Waiting for Vision Pro.");
             }
             return error;
         }
@@ -247,7 +249,7 @@ sealed class Host : IDisposable
             _xr.Dispose();
             _xr = null;
             Log.Write($"quad yielded to {id}");
-            StatusChanged?.Invoke("A VR game is running on the Vision Pro.");
+            SetStatus("Playing on Vision Pro. The desktop returns when the game quits.");
         }
         finally { _lifecycle.Release(); }
         await _desktop.GameStartedAsync(id);
@@ -269,7 +271,7 @@ sealed class Host : IDisposable
             if (!_immersive || _xr is not null) return;
             var error = await StartXrAsync(null, true);
             Log.Write(error is null ? $"quad restored after {id}" : $"quad restart failed {error}");
-            StatusChanged?.Invoke("Vision Pro is in Immersive Mode.");
+            SetStatus("Immersive Mode. Press Play in Steam on the big screen to start a VR game.");
         }
         finally { _lifecycle.Release(); }
         await _desktop.GameEndedAsync(id, "exited");

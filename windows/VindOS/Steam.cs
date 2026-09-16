@@ -14,15 +14,11 @@ static class Steam
 
     public static Process? Running() => Process.GetProcessesByName("steam").FirstOrDefault();
 
-    public static string Status()
+    public static bool? ThroughVindOS()
     {
         using var steam = Running();
-        if (steam is null) return "Steam is not running.";
-        var env = ProcessEnv.Read(steam.Id);
-        if (env is null) return "Steam is running; its environment could not be read.";
-        return env.TryGetValue("XR_RUNTIME_JSON", out var json) && string.Equals(json, StreamManager.RuntimeJson, StringComparison.OrdinalIgnoreCase)
-            ? "Steam is running through vindOS. Games you start from Steam use the Vision Pro in Immersive Mode."
-            : "Steam is running without vindOS. Restart it through vindOS so games can use the Vision Pro.";
+        if (steam is null) return null;
+        return ProcessEnv.Read(steam.Id) is { } env && env.TryGetValue("XR_RUNTIME_JSON", out var json) && string.Equals(json, StreamManager.RuntimeJson, StringComparison.OrdinalIgnoreCase);
     }
 
     public static async Task RestartAsync(CancellationToken ct)

@@ -10,6 +10,7 @@
     <RootNamespace>VindOS</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="QRCoder" Version="1.6.0" />
