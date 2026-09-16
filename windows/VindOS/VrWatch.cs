@@ -14,9 +14,12 @@ sealed class VrWatch : IDisposable
     public event Action<int, string, string>? Started;
     public event Action<int, string>? Ended;
 
+    static readonly HashSet<string> Ignored = new(StringComparer.OrdinalIgnoreCase) { "steam", "steamwebhelper", "steamservice", "vrmonitor", "vrserver", "vrcompositor" };
+
     readonly int _self = Environment.ProcessId;
     readonly Timer _timer;
-    int _pid, _busy;
+    readonly HashSet<int> _seen = [];
+    int _pid, _busy, _tick;
     string _id = "";
     bool _timed;
 
@@ -39,10 +42,12 @@ sealed class VrWatch : IDisposable
                 return;
             }
             var watch = Stopwatch.StartNew();
+            var full = _tick++ % 10 == 0;
             foreach (var p in Process.GetProcesses())
                 using (p)
                 {
-                    if (p.Id == _self || _pid != 0) continue;
+                    if (p.Id == _self || _pid != 0 || Ignored.Contains(p.ProcessName) || (!full && !_seen.Add(p.Id))) continue;
+                    _seen.Add(p.Id);
                     try
                     {
                         foreach (ProcessModule m in p.Modules)
@@ -50,7 +55,7 @@ sealed class VrWatch : IDisposable
                             {
                                 _pid = p.Id;
                                 var env = ProcessEnv.Read(p.Id);
-                                _id = env is not null && env.TryGetValue("SteamAppId", out var app) ? app : p.ProcessName;
+                                _id = env is not null && env.TryGetValue("SteamAppId", out var app) && app.Length > 0 ? app : p.ProcessName;
                                 var runtime = env is null ? "env unreadable" : env.TryGetValue("XR_RUNTIME_JSON", out var json) ? (string.Equals(json, StreamManager.RuntimeJson, StringComparison.OrdinalIgnoreCase) ? "vindOS runtime" : "other runtime") : "no XR_RUNTIME_JSON";
                                 Log.Write($"vr process {p.ProcessName} pid {p.Id} loaded {m.ModuleName}, id {_id}, {runtime}");
                                 Started?.Invoke(p.Id, p.ProcessName, _id);
@@ -59,7 +64,7 @@ sealed class VrWatch : IDisposable
                     }
                     catch (Exception e) when (e is Win32Exception or InvalidOperationException) { }
                 }
-            if (!_timed) { _timed = true; Log.Write($"vr watch scan {watch.ElapsedMilliseconds} ms"); }
+            if (full && !_timed) { _timed = true; Log.Write($"vr watch full scan {watch.ElapsedMilliseconds} ms"); }
         }
         finally { _busy = 0; }
     }
