@@ -22,12 +22,12 @@ final class Desktop {
                 if case .bonjour(let txt) = result.metadata { return txt["ServerID"] == pair.serverId }
                 return false
             }), case .bonjour(let txt) = match.metadata, let port = txt["DesktopPort"].flatMap(UInt16.init),
-                  case .service(let name, let type, let domain, _) = match.endpoint else { return }
+                  case .service(let name, _, _, _) = match.endpoint else { return }
             Task { @MainActor in
                 guard let self, self.browser === browser else { return }
                 browser.cancel()
                 self.browser = nil
-                self.open(.hostPort(host: .init("\(name).\(type)\(domain)"), port: .init(rawValue: port)!), pair: pair)
+                self.open(.hostPort(host: .init("\(name).local"), port: .init(rawValue: port)!), pair: pair)
             }
         }
         browser.start(queue: .main)
