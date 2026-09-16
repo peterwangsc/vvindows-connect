@@ -37,13 +37,13 @@ struct DesktopView: View {
             if desktop.immersion == .off { desktop.disconnect() }
         }
         .onChange(of: desktop.immersion) { _, immersion in
-            if immersion == .on { dismissWindow(id: "desktop") }
+            if immersion == .on { toHome() }
         }
         .onChange(of: desktop.session.status) { _, status in
             switch status {
             case .connected:
                 desktop.immersiveConnected()
-                dismissWindow(id: "desktop")
+                toHome()
             case .disconnected: if desktop.immersion == .on { desktop.leaveImmersive() }
             default: break
             }

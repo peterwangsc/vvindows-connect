@@ -21,7 +21,7 @@ struct HomeView: View {
             .onAppear {
                 connection.homeWindows += 1
                 if connection.homeWindows > 1 { return dismissWindow() }
-                if desktop.windowOpen, desktop.state == .idle { dismissWindow(id: "desktop") }
+                if desktop.windowOpen, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
             .task {
@@ -57,6 +57,7 @@ struct HomeView: View {
     private var status: String {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): "Pairing…"
+        case (_, let pair?) where desktop.immersion != .off: "Fullscreen on \(pair.hostName)"
         case (_, let pair?): "Paired with \(pair.hostName)"
         default: "Not paired"
         }
@@ -66,6 +67,8 @@ struct HomeView: View {
         switch (connection.activity, connection.pair) {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
+        case (_, _?) where desktop.immersion != .off:
+            Button("Windowed") { desktop.leaveImmersive() }.buttonStyle(.borderedProminent)
         case (_, let pair?):
             Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)
