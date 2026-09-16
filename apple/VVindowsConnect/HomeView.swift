@@ -20,7 +20,8 @@ struct HomeView: View {
             .navigationTitle("vindOS")
             .onAppear {
                 connection.homeWindows += 1
-                if connection.homeWindows > 1 { dismissWindow() }
+                if connection.homeWindows > 1 { return dismissWindow() }
+                if desktop.windowOpen, desktop.state == .idle { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
             .task {
