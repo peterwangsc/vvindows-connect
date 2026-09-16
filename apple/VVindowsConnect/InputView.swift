@@ -44,7 +44,7 @@ final class InputView: UIView, UIKeyInput {
     @objc private func wheel(_ g: UIPanGestureRecognizer) {
         guard g.state == .changed else { scroll = .zero; return }
         let t = g.translation(in: self)
-        let dy = Int32((t.y - scroll.y) * 4), dx = Int32((t.x - scroll.x) * 4)
+        let dy = Int32((scroll.y - t.y) * 4), dx = Int32((scroll.x - t.x) * 4)
         scroll = t
         if dy != 0 || dx != 0 { send?(.wheel(dy, dx)) }
     }
