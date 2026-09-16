@@ -220,6 +220,7 @@ sealed class Desktop : IDisposable
     }
 
     public int ApplePort { get; set; }
+    public bool Streaming => _stream is not null;
     volatile bool _immersive;
 
     public void Disconnect()

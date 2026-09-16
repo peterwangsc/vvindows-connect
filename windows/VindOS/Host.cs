@@ -74,7 +74,7 @@ sealed class Host : IDisposable
     void Idle()
     {
         QrChanged?.Invoke(null);
-        StatusChanged?.Invoke(Pair is null ? "Not paired." : $"Paired since {Pair.PairedAt.LocalDateTime:g}.");
+        StatusChanged?.Invoke(_desktop.Streaming ? "Vision Pro is viewing this desktop." : Pair is null ? "Not paired." : $"Paired since {Pair.PairedAt.LocalDateTime:g}.");
     }
 
     async Task ListenAsync()
