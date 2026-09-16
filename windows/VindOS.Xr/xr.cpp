@@ -1,18 +1,15 @@
 #define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_D3D11
-#include <windows.h>
-#include <d3d11.h>
-#include <dxgi1_2.h>
+#include "capture.h"
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <atomic>
 #include <chrono>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
-
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
 
 XR_DEFINE_HANDLE(XrOpaqueDataChannelNV)
 #define XR_TYPE_OPAQUE_DATA_CHANNEL_CREATE_INFO_NV ((XrStructureType)1000500000)
@@ -29,25 +26,46 @@ typedef XrResult(XRAPI_PTR* PFN_send)(XrOpaqueDataChannelNV, uint32_t, const uin
 
 typedef void(__stdcall* EventFn)(int32_t kind, int32_t value);
 enum { EV_STAGE = 1, EV_SESSION = 2, EV_CHANNEL = 3, EV_SENT = 4, EV_ERROR = 5, EV_EXIT = 6 };
-enum { ST_INSTANCE = 1, ST_SYSTEM, ST_D3D, ST_SESSION, ST_SWAPCHAIN, ST_CHANNEL, ST_LOOP };
+enum { ST_INSTANCE = 1, ST_SYSTEM, ST_D3D, ST_SESSION, ST_SWAPCHAIN, ST_CHANNEL, ST_LOOP, ST_CAPTURE };
 
 static std::atomic<bool> g_quit{ false };
 static std::thread g_thread;
+static std::mutex g_lifecycle;
 
 struct Swap { XrSwapchain handle; int32_t w, h; std::vector<XrSwapchainImageD3D11KHR> images; std::vector<ID3D11RenderTargetView*> rtvs; };
 
-static void run(std::wstring runtimeJson, std::string paired, EventFn ev) {
+static bool makeSwap(XrSession sess, ID3D11Device* dev, uint32_t w, uint32_t h, uint32_t samples, Swap& s, XrResult& r) {
+	XrSwapchainCreateInfo si = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+	si.arraySize = si.mipCount = si.faceCount = 1; si.format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+	si.width = w; si.height = h; si.sampleCount = samples;
+	si.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
+	s = {}; s.w = w; s.h = h;
+	if (XR_FAILED(r = xrCreateSwapchain(sess, &si, &s.handle))) return false;
+	uint32_t ic = 0; xrEnumerateSwapchainImages(s.handle, 0, &ic, nullptr);
+	s.images.resize(ic, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR });
+	xrEnumerateSwapchainImages(s.handle, ic, &ic, (XrSwapchainImageBaseHeader*)s.images.data());
+	for (auto& im : s.images) {
+		D3D11_RENDER_TARGET_VIEW_DESC rd = {}; rd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D; rd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+		ID3D11RenderTargetView* rtv = nullptr; dev->CreateRenderTargetView(im.texture, &rd, &rtv); s.rtvs.push_back(rtv);
+	}
+	return true;
+}
+
+static void run(std::wstring runtimeJson, std::string paired, float quadWidth, float quadDistance, EventFn ev) {
 	SetEnvironmentVariableW(L"XR_RUNTIME_JSON", runtimeJson.c_str());
 	auto fail = [&](int stage, XrResult r) { ev(EV_ERROR, stage * 100000 + (int32_t)r); };
 	XrInstance inst = XR_NULL_HANDLE; XrSession sess = XR_NULL_HANDLE; XrSpace space = XR_NULL_HANDLE;
 	ID3D11Device* dev = nullptr; ID3D11DeviceContext* ctx = nullptr;
 	XrOpaqueDataChannelNV chan = XR_NULL_HANDLE; PFN_destroy pDestroy = nullptr; PFN_shutdown pShutdown = nullptr;
-	std::vector<Swap> swaps;
-	XrSessionState state = XR_SESSION_STATE_UNKNOWN; bool running = false, sent = false;
+	std::vector<Swap> swaps; Swap quad{}; std::unique_ptr<Capture> cap;
+	const bool quadMode = quadWidth > 0;
+	XrSessionState state = XR_SESSION_STATE_UNKNOWN; bool running = false, sent = paired.empty();
 	auto cleanup = [&]() {
 		if (chan && pShutdown) pShutdown(chan);
 		if (chan && pDestroy) pDestroy(chan);
 		for (auto& s : swaps) { for (auto* v : s.rtvs) v->Release(); xrDestroySwapchain(s.handle); }
+		if (quad.handle) { for (auto* v : quad.rtvs) v->Release(); xrDestroySwapchain(quad.handle); }
+		cap.reset();
 		if (space) xrDestroySpace(space);
 		if (sess) xrDestroySession(sess);
 		if (inst) xrDestroyInstance(inst);
@@ -92,8 +110,12 @@ static void run(std::wstring runtimeJson, std::string paired, EventFn ev) {
 	}
 	fac->Release();
 	D3D_FEATURE_LEVEL fl = D3D_FEATURE_LEVEL_11_0;
-	if (!pick || FAILED(D3D11CreateDevice(pick, D3D_DRIVER_TYPE_UNKNOWN, 0, 0, &fl, 1, D3D11_SDK_VERSION, &dev, nullptr, &ctx))) { fail(ST_D3D, XR_ERROR_RUNTIME_FAILURE); if (pick) pick->Release(); return cleanup(); }
+	if (!pick || FAILED(D3D11CreateDevice(pick, D3D_DRIVER_TYPE_UNKNOWN, 0, D3D11_CREATE_DEVICE_BGRA_SUPPORT, &fl, 1, D3D11_SDK_VERSION, &dev, nullptr, &ctx))) { fail(ST_D3D, XR_ERROR_RUNTIME_FAILURE); if (pick) pick->Release(); return cleanup(); }
 	pick->Release();
+	if (quadMode) {
+		ev(EV_STAGE, ST_CAPTURE);
+		try { cap = std::make_unique<Capture>(); cap->init(dev, ctx); } catch (CaptureError e) { fail(ST_CAPTURE, (XrResult)(e.hr & 0xFFFF)); return cleanup(); }
+	}
 	ev(EV_STAGE, ST_SESSION);
 	XrGraphicsBindingD3D11KHR bind = { XR_TYPE_GRAPHICS_BINDING_D3D11_KHR }; bind.device = dev;
 	XrSessionCreateInfo sci = { XR_TYPE_SESSION_CREATE_INFO }; sci.next = &bind; sci.systemId = sys;
@@ -107,27 +129,15 @@ static void run(std::wstring runtimeJson, std::string paired, EventFn ev) {
 	std::vector<XrViewConfigurationView> cfg(vc, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
 	xrEnumerateViewConfigurationViews(inst, sys, vct, vc, &vc, cfg.data());
 	std::vector<XrView> views(vc, { XR_TYPE_VIEW });
-	for (auto& v : cfg) {
-		XrSwapchainCreateInfo si = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
-		si.arraySize = si.mipCount = si.faceCount = 1; si.format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-		si.width = v.recommendedImageRectWidth; si.height = v.recommendedImageRectHeight; si.sampleCount = v.recommendedSwapchainSampleCount;
-		si.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-		Swap s = {}; s.w = si.width; s.h = si.height;
-		if (XR_FAILED(r = xrCreateSwapchain(sess, &si, &s.handle))) { fail(ST_SWAPCHAIN, r); return cleanup(); }
-		uint32_t ic = 0; xrEnumerateSwapchainImages(s.handle, 0, &ic, nullptr);
-		s.images.resize(ic, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR });
-		xrEnumerateSwapchainImages(s.handle, ic, &ic, (XrSwapchainImageBaseHeader*)s.images.data());
-		for (auto& im : s.images) {
-			D3D11_RENDER_TARGET_VIEW_DESC rd = {}; rd.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D; rd.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-			ID3D11RenderTargetView* rtv = nullptr; dev->CreateRenderTargetView(im.texture, &rd, &rtv); s.rtvs.push_back(rtv);
-		}
-		swaps.push_back(s);
-	}
+	for (auto& v : cfg) { Swap s; if (!makeSwap(sess, dev, v.recommendedImageRectWidth, v.recommendedImageRectHeight, v.recommendedSwapchainSampleCount, s, r)) { fail(ST_SWAPCHAIN, r); return cleanup(); } swaps.push_back(s); }
+	if (quadMode && !makeSwap(sess, dev, cap->w, cap->h, 1, quad, r)) { fail(ST_SWAPCHAIN, r); return cleanup(); }
 	ev(EV_STAGE, ST_CHANNEL);
-	if (pCreate) {
-		XrOpaqueDataChannelCreateInfoNV cci = { XR_TYPE_OPAQUE_DATA_CHANNEL_CREATE_INFO_NV, nullptr, sys, { 0x76696e64, 0x4f53, 0x0001, {0x76,0x69,0x6e,0x64,0x4f,0x53,0x00,0x01} } };
-		if (XR_FAILED(r = pCreate(inst, &cci, &chan))) { fail(ST_CHANNEL, r); chan = XR_NULL_HANDLE; }
-	} else fail(ST_CHANNEL, XR_ERROR_EXTENSION_NOT_PRESENT);
+	if (!paired.empty()) {
+		if (pCreate) {
+			XrOpaqueDataChannelCreateInfoNV cci = { XR_TYPE_OPAQUE_DATA_CHANNEL_CREATE_INFO_NV, nullptr, sys, { 0x76696e64, 0x4f53, 0x0001, {0x76,0x69,0x6e,0x64,0x4f,0x53,0x00,0x01} } };
+			if (XR_FAILED(r = pCreate(inst, &cci, &chan))) { fail(ST_CHANNEL, r); chan = XR_NULL_HANDLE; }
+		} else fail(ST_CHANNEL, XR_ERROR_EXTENSION_NOT_PRESENT);
+	}
 	ev(EV_STAGE, ST_LOOP);
 	int chanState = -1; auto lastPoll = std::chrono::steady_clock::now();
 	const float clear[4] = { 0.f, 0.f, 0.f, 1.f };
@@ -155,7 +165,8 @@ static void run(std::wstring runtimeJson, std::string paired, EventFn ev) {
 		xrWaitFrame(sess, nullptr, &fs); xrBeginFrame(sess, nullptr);
 		std::vector<XrCompositionLayerProjectionView> pv;
 		XrCompositionLayerProjection layer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
-		XrCompositionLayerBaseHeader* layers[1] = { nullptr };
+		XrCompositionLayerQuad qlayer = { XR_TYPE_COMPOSITION_LAYER_QUAD };
+		XrCompositionLayerBaseHeader* layers[2] = { nullptr, nullptr }; uint32_t layerCount = 0;
 		if (visible) {
 			XrViewState vs = { XR_TYPE_VIEW_STATE }; XrViewLocateInfo li = { XR_TYPE_VIEW_LOCATE_INFO };
 			li.viewConfigurationType = vct; li.displayTime = fs.predictedDisplayTime; li.space = space;
@@ -172,25 +183,46 @@ static void run(std::wstring runtimeJson, std::string paired, EventFn ev) {
 				pv[i].pose = views[i].pose; pv[i].fov = views[i].fov;
 				pv[i].subImage.swapchain = swaps[i].handle; pv[i].subImage.imageRect = { {0, 0}, {swaps[i].w, swaps[i].h} };
 			}
-			layer.space = space; layer.viewCount = cnt; layer.views = pv.data(); layers[0] = (XrCompositionLayerBaseHeader*)&layer;
+			layer.space = space; layer.viewCount = cnt; layer.views = pv.data(); layers[layerCount++] = (XrCompositionLayerBaseHeader*)&layer;
+			if (quadMode) {
+				bool fresh = false; ID3D11Texture2D* tex = nullptr;
+				try { tex = cap->acquire(0, fresh); } catch (CaptureError e) { fail(ST_CAPTURE, (XrResult)(e.hr & 0xFFFF)); g_quit = true; }
+				if (tex) {
+					uint32_t idx = 0; XrSwapchainImageAcquireInfo ai = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+					xrAcquireSwapchainImage(quad.handle, &ai, &idx);
+					XrSwapchainImageWaitInfo wi = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO }; wi.timeout = XR_INFINITE_DURATION;
+					xrWaitSwapchainImage(quad.handle, &wi);
+					ctx->CopyResource(quad.images[idx].texture, tex);
+					XrSwapchainImageReleaseInfo ri = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+					xrReleaseSwapchainImage(quad.handle, &ri);
+					qlayer.space = space; qlayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+					qlayer.subImage.swapchain = quad.handle; qlayer.subImage.imageRect = { {0, 0}, {quad.w, quad.h} };
+					qlayer.pose = { {0, 0, 0, 1}, {0, 0, -quadDistance} };
+					qlayer.size = { quadWidth, quadWidth * quad.h / quad.w };
+					layers[layerCount++] = (XrCompositionLayerBaseHeader*)&qlayer;
+				}
+				cap->release();
+			}
 		}
 		XrFrameEndInfo fe = { XR_TYPE_FRAME_END_INFO };
 		fe.displayTime = fs.predictedDisplayTime; fe.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-		fe.layerCount = layers[0] ? 1 : 0; fe.layers = layers;
+		fe.layerCount = layerCount; fe.layers = layers;
 		xrEndFrame(sess, &fe);
 	}
 	if (running) { xrRequestExitSession(sess); xrEndSession(sess); }
 	cleanup();
 }
 
-extern "C" __declspec(dllexport) int32_t vindos_xr_start(const wchar_t* runtimeJson, const char* pairedJson, EventFn onEvent) {
+extern "C" __declspec(dllexport) int32_t vindos_xr_start(const wchar_t* runtimeJson, const char* pairedJson, float quadWidth, float quadDistance, EventFn onEvent) {
+	std::lock_guard<std::mutex> lock(g_lifecycle);
 	if (g_thread.joinable()) return -1;
 	g_quit = false;
-	g_thread = std::thread(run, std::wstring(runtimeJson), std::string(pairedJson), onEvent);
+	g_thread = std::thread(run, std::wstring(runtimeJson), std::string(pairedJson ? pairedJson : ""), quadWidth, quadDistance, onEvent);
 	return 0;
 }
 
 extern "C" __declspec(dllexport) void vindos_xr_stop() {
+	std::lock_guard<std::mutex> lock(g_lifecycle);
 	g_quit = true;
 	if (g_thread.joinable()) g_thread.join();
 }
