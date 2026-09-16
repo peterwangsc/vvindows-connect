@@ -28,8 +28,10 @@ Platform-owned permission UI remains platform-owned.
 
 ## Current milestone
 
-**Immersive games: one owned PC application streamed through the same
-session, and reliable return to the desktop.**
+**Soft v0.** vindOS 0.1.0 (1) for Vision Pro is uploaded to App Store Connect
+for TestFlight. The Windows installer (per-user, unsigned, ships no NVIDIA
+files; the app imports the CloudXR Runtime and Stream Manager archives the user
+downloads from NGC) is built from `windows/`.
 
 Verified on hardware on 2026-09-16:
 
@@ -42,23 +44,16 @@ Verified on hardware on 2026-09-16:
 - Input: pointer, click, drag, trackpad scroll, physical keyboard and the
   visionOS keyboard all reach Windows. Windows running as administrator ignore
   injected input (UIPI); vindOS runs as a normal user.
-- Immersive: Fullscreen shows the desktop on a large screen in an immersive
-  space using the saved pair, no second scan. The Crown dials the
-  surroundings. Windowed, Apple's Exit, the Crown and the Home gesture all
-  return to the live desktop window. A pinch on the surroundings shows or
-  hides the control panel.
-- Games: the Windows client restarts Steam through vindOS once, so every game
-  Steam launches inherits our runtime; it lists the VR-capable titles it found
-  and installs the OpenVR bridge for them (originals kept, removable). In
-  Fullscreen you press Play inside Steam on the big screen; the game takes over
-  the screen, recenters, and the desktop returns when it quits (Assetto Corsa,
-  driven with the PC's keyboard and mouse). Windowed launches run flat.
-- Fullscreen panel: a pinch on the surroundings shows a panel in front of your
-  chest with Recenter and Windowed; a pinch on the surroundings hides it.
+- Fullscreen: the desktop on a large screen placed in front of the viewer;
+  the Crown dials the surroundings; a pinch on the surroundings shows a panel
+  with Recenter and Windowed, another hides it. Windowed, Apple's Exit, the
+  Crown and the Home gesture all return to the live desktop window.
+- Games: Steam runs through vindOS once restarted from Settings; Play inside
+  Steam on the big screen hands the screen to the game, which recenters once
+  on take-over; quitting returns the desktop (Assetto Corsa, driven with the
+  PC's keyboard and mouse).
 
-The MacBook keyboard cannot reach the headset in Fullscreen because Mac
-Virtual Display is hidden inside immersive spaces; PC-attached input or a
-Bluetooth keyboard paired to the headset is required.
-
-Also not yet verified: any latency figure. The simulator build stubs the Apple
-streaming session and is for UI checks only; it is not a hardware result.
+Open before a public link: NVIDIA CloudXR redistribution terms, a Windows
+code-signing certificate, an installer EULA. The MacBook keyboard cannot reach
+the headset in Fullscreen because Mac Virtual Display is hidden inside
+immersive spaces. No latency figure has been measured.
