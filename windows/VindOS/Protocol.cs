@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -21,7 +22,9 @@ static class Wire
     {
         var head = new byte[4];
         await s.ReadExactlyAsync(head, ct);
-        var body = new byte[BinaryPrimitives.ReadInt32LittleEndian(head)];
+        var length = BinaryPrimitives.ReadInt32LittleEndian(head);
+        if (length is < 2 or > 65536) throw new InvalidDataException($"Frame length {length} out of range.");
+        var body = new byte[length];
         await s.ReadExactlyAsync(body, ct);
         return JsonDocument.Parse(body);
     }
