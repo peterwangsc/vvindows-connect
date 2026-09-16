@@ -186,8 +186,12 @@ final class Desktop {
         case 0:
             guard body.count > 9 else { return }
             let captured = Int64(bitPattern: body.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }.littleEndian)
-            let enqueued = video.enqueue(annexB: body.dropFirst(9), keyframe: body[body.startIndex + 8] & 1 == 1)
-            if !enqueued { dropped += 1 } else if let best = clock.min(by: { $0.rtt < $1.rtt }) { samples.append(Self.now - (captured + best.offset)) }
+            let flags = body[body.startIndex + 8]
+            let enqueued = video.enqueue(annexB: body.dropFirst(9), keyframe: flags & 1 == 1)
+            if !enqueued { dropped += 1 } else if flags & 2 == 0, let best = clock.min(by: { $0.rtt < $1.rtt }) {
+                let sample = Self.now - (captured + best.offset)
+                if (0...5_000_000).contains(sample) { samples.append(sample) }
+            }
         case 1:
             guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any], let kind = json["type"] as? String else { return }
             switch kind {

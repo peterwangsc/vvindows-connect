@@ -48,7 +48,7 @@ payload.
 
 | type | direction | payload |
 | --- | --- | --- |
-| 0 VIDEO | host → headset | `u64 LE captureTimestampUs`, `u8 flags` (bit 0 = keyframe), one H.264 Annex B access unit; SPS and PPS precede every IDR |
+| 0 VIDEO | host → headset | `u64 LE captureTimestampUs`, `u8 flags` (bit 0 = keyframe, bit 1 = repeat of the previous frame), one H.264 Annex B access unit; SPS and PPS precede every IDR |
 | 1 CONTROL | both | UTF-8 JSON object with `v` and `type` |
 
 Frames above 16 MiB drop the connection on both sides.
