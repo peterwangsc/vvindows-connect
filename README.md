@@ -53,7 +53,10 @@ Verified on hardware on 2026-09-16:
   on take-over; quitting returns the desktop (Assetto Corsa, driven with the
   PC's keyboard and mouse).
 
-Open before a public link: NVIDIA CloudXR redistribution terms, a Windows
-code-signing certificate, an installer EULA. The MacBook keyboard cannot reach
+Decided for v0: NVIDIA CloudXR is not bundled (the user downloads it from NGC
+and vindOS imports it); the installer is unsigned and says so; the product is
+vindOS; the installer carries a pre-release license. Before a public link:
+revisit CloudXR redistribution and buy a code-signing certificate. The MacBook
+keyboard cannot reach
 the headset in Fullscreen because Mac Virtual Display is hidden inside
 immersive spaces. No latency figure has been measured.
