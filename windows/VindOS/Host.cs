@@ -127,13 +127,10 @@ sealed class Host : IDisposable
                 if (status == Status.Waiting) await BeginStreamAsync();
                 else if (status == Status.Connected)
                 {
-                    if (!_session!.Reconnect)
-                    {
-                        var hash = Convert.ToHexStringLower(SHA256.HashData(Convert.FromHexString(_session.DesktopToken)));
-                        PairStore.SavePair(Pair = new Pair(_session.ClientId, _identity.ServerId, _session.Fingerprint, hash, DateTimeOffset.Now));
-                        _armed = false;
-                        PairChanged?.Invoke(Pair);
-                    }
+                    var hash = Convert.ToHexStringLower(SHA256.HashData(Convert.FromHexString(_session!.DesktopToken)));
+                    PairStore.SavePair(Pair = new Pair(_session.ClientId, _identity.ServerId, _session.Fingerprint, hash, Pair?.PairedAt ?? DateTimeOffset.Now));
+                    _armed = false;
+                    PairChanged?.Invoke(Pair);
                     StatusChanged?.Invoke("Vision Pro connected.");
                 }
                 else if (status == Status.Disconnected) await EndSessionAsync();
