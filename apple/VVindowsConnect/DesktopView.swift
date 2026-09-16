@@ -41,7 +41,9 @@ struct DesktopView: View {
         }
         .onChange(of: desktop.session.status) { _, status in
             switch status {
-            case .connected: desktop.immersiveConnected()
+            case .connected:
+                desktop.immersiveConnected()
+                dismissWindow(id: "desktop")
             case .disconnected: if desktop.immersion == .on { desktop.leaveImmersive() }
             default: break
             }

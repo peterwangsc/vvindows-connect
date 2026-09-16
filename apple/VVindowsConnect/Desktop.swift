@@ -145,7 +145,10 @@ final class Desktop {
                 Task {
                     do { try await session.connect(endpoint: .local(ipAddress: host, port: port)) } catch { leaveImmersive() }
                 }
-            case "windowed": if immersion == .on { leaveImmersive() }
+            case "windowed":
+                if immersion == .on { leaveImmersive() }
+                video.reset()
+                connection?.send(content: Frame.control(["v": 1, "type": "keyframe"]), completion: .idempotent)
             case "bye": disconnect()
             default: break
             }
