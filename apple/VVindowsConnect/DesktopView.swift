@@ -34,7 +34,10 @@ struct DesktopView: View {
         }
         .onDisappear {
             desktop.windowOpen = false
-            desktop.disconnect()
+            if desktop.immersion == .off { desktop.disconnect() }
+        }
+        .onChange(of: desktop.immersion) { _, immersion in
+            if immersion == .on { dismissWindow(id: "desktop") }
         }
         .onChange(of: desktop.session.status) { _, status in
             if case .disconnected = status, desktop.immersion == .on { desktop.leaveImmersive() }
@@ -51,8 +54,7 @@ struct DesktopView: View {
                 if case .streaming = desktop.state {
                     switch desktop.immersion {
                     case .off: Button("Fullscreen") { desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
-                    case .starting: ProgressView()
-                    case .on: Button("Windowed") { desktop.leaveImmersive() }
+                    default: ProgressView()
                     }
                 }
                 Text(desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
@@ -60,6 +62,18 @@ struct DesktopView: View {
             }
             .padding(8)
             .glassBackgroundEffect()
+        }
+    }
+}
+
+struct ImmersiveExit: View {
+    let desktop: Desktop
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Color.clear.onDisappear {
+            desktop.leaveImmersive()
+            openWindow(id: "desktop")
         }
     }
 }
