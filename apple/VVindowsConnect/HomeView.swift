@@ -17,6 +17,7 @@ struct HomeView: View {
                 action
             }
             .padding(32)
+            .controlSize(.extraLarge)
             .navigationTitle("vindOS")
             .onAppear {
                 #if targetEnvironment(simulator)
@@ -80,20 +81,16 @@ struct HomeView: View {
         case (_, _?) where desktop.immersion != .off:
             switch desktop.game {
             case .starting(let game): ProgressView("Starting \(game.name)…")
-            case .running(let game):
-                Text("Playing \(game.name)").foregroundStyle(.secondary)
-                Button("Recenter") { desktop.recenter() }
-                KeyboardView { desktop.send($0) }
-                    .frame(height: 60)
-                    .overlay { Text("Tap here, then type to drive").foregroundStyle(.secondary).allowsHitTesting(false) }
-                    .glassBackgroundEffect()
+            case .running(let game): Text("Playing \(game.name)").foregroundStyle(.secondary)
             case .failed(let reason): Text(reason).foregroundStyle(.secondary)
             case .none: EmptyView()
             }
+            Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
             if case .running = desktop.game {} else if case .starting = desktop.game {} else {
-                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) } }
+                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) }.buttonStyle(.borderedProminent) }
             }
-            Button("Windowed") { desktop.leaveImmersive() }.buttonStyle(.borderedProminent)
+            Button("Windowed") { desktop.leaveImmersive() }
+            Button("Hide") { dismissWindow(id: "home") }
         case (_, let pair?):
             Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)

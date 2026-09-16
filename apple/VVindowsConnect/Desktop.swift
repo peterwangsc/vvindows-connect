@@ -47,7 +47,7 @@ final class Desktop {
     }
 
     func recenter() {
-        guard case .running = game else { return }
+        guard immersion == .on else { return }
         connection?.send(content: Frame.control(["v": 1, "type": "recenter"]), completion: .idempotent)
     }
 

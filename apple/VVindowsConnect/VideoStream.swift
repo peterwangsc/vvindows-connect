@@ -17,7 +17,8 @@ final class VideoStream {
         format = nil
     }
 
-    func enqueue(annexB: Data, keyframe: Bool) {
+    @discardableResult
+    func enqueue(annexB: Data, keyframe: Bool) -> Bool {
         var avcc = Data()
         for nal in nalUnits(annexB) {
             switch nal.first.map({ $0 & 0x1f }) {
@@ -38,19 +39,20 @@ final class VideoStream {
                 if let description, format == nil || !CMFormatDescriptionEqual(description, otherFormatDescription: format) { format = description }
             } }
         }
-        guard let format, !avcc.isEmpty else { return }
+        guard let format, !avcc.isEmpty else { return false }
         var block: CMBlockBuffer?
         CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: avcc.count, blockAllocator: nil, customBlockSource: nil, offsetToData: 0, dataLength: avcc.count, flags: 0, blockBufferOut: &block)
-        guard let block else { return }
+        guard let block else { return false }
         avcc.withUnsafeBytes { CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: avcc.count) }
         var sample: CMSampleBuffer?
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
         var size = avcc.count
         CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
-        guard let sample, let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) as? [NSMutableDictionary] else { return }
+        guard let sample, let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) as? [NSMutableDictionary] else { return false }
         attachments.first?[kCMSampleAttachmentKey_DisplayImmediately] = true
         if layer.sampleBufferRenderer.status == .failed || layer.sampleBufferRenderer.requiresFlushToResumeDecoding { layer.sampleBufferRenderer.flush() }
         layer.sampleBufferRenderer.enqueue(sample)
+        return true
     }
 
     private func nalUnits(_ data: Data) -> [Data] {
