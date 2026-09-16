@@ -21,15 +21,18 @@ struct HomeView: View {
                 Button("Settings", systemImage: "gear") { showingSettings = true }
             }
             .sheet(isPresented: $showingSettings) {
-                List {
-                    Button("Forget connection", role: .destructive) {
-                        desktop.disconnect()
-                        connection.forget()
-                        showingSettings = false
+                NavigationStack {
+                    List {
+                        Button("Forget connection", role: .destructive) {
+                            desktop.disconnect()
+                            connection.forget()
+                            showingSettings = false
+                        }
+                        .disabled(connection.pair == nil)
                     }
-                    .disabled(connection.pair == nil)
+                    .navigationTitle("Settings")
+                    .toolbar { Button("Done") { showingSettings = false } }
                 }
-                .presentationDetents([.medium])
             }
         }
     }
