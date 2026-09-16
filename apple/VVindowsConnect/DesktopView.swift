@@ -23,7 +23,7 @@ struct DesktopView: View {
             VideoView(stream: desktop.video, frameSize: frameSize) { desktop.send($0) }
             switch desktop.state {
             case .connecting: ProgressView("Connecting…")
-            case .failed(let reason): Text(reason).padding().glassBackgroundEffect()
+            case .failed: Text("Could not reach the PC. Check that vindOS is running on it, then Connect again.").padding().glassBackgroundEffect()
             default: EmptyView()
             }
         }

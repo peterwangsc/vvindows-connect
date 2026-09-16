@@ -30,7 +30,7 @@ final class Connection {
             } catch is CancellationError {
                 activity = .idle
             } catch {
-                activity = .failed(error.localizedDescription)
+                activity = .failed("Pairing did not finish. Click Pair on the PC and try again.")
             }
             await session.disconnect()
         }

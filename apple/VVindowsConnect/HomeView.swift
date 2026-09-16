@@ -49,12 +49,17 @@ struct HomeView: View {
             .sheet(isPresented: $showingSettings) {
                 NavigationStack {
                     List {
+                        if let pair = connection.pair {
+                            LabeledContent("PC", value: pair.hostName)
+                            LabeledContent("Paired", value: pair.pairedAt.formatted(date: .abbreviated, time: .shortened))
+                        }
                         Button("Forget connection", role: .destructive) {
                             desktop.disconnect()
                             connection.forget()
                             showingSettings = false
                         }
                         .disabled(connection.pair == nil)
+                        LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                     }
                     .navigationTitle("Settings")
                     .toolbar { Button("Done") { showingSettings = false } }

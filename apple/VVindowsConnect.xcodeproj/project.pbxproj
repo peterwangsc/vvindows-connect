@@ -20,6 +20,14 @@
 		B00000000000000000000B12 = {isa = PBXBuildFile; fileRef = A00000000000000000000A12; };
 		A00000000000000000000A13 /* Simulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Simulator.swift; sourceTree = "<group>"; };
 		B00000000000000000000B13 = {isa = PBXBuildFile; fileRef = A00000000000000000000A13; };
+		A00000000000000000000A14 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B00000000000000000000B14 = {isa = PBXBuildFile; fileRef = A00000000000000000000A14; };
+		D000000000000000000000D3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B00000000000000000000B14);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A000000000000000000000A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* VVindowsConnect.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VVindowsConnect.entitlements; sourceTree = "<group>"; };
 		A000000000000000000000A8 /* VVindowsConnect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VVindowsConnect.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -30,7 +38,7 @@
 		B000000000000000000000B5 = {isa = PBXBuildFile; fileRef = A000000000000000000000A5; };
 		C000000000000000000000C1 /* VVindowsConnect */ = {
 			isa = PBXGroup;
-			children = (A000000000000000000000A1, A000000000000000000000A2, A000000000000000000000A3, A000000000000000000000A4, A000000000000000000000A5, A000000000000000000000A9, A00000000000000000000A10, A00000000000000000000A11, A00000000000000000000A12, A00000000000000000000A13, A000000000000000000000A6, A000000000000000000000A7);
+			children = (A000000000000000000000A1, A000000000000000000000A2, A000000000000000000000A3, A000000000000000000000A4, A000000000000000000000A5, A000000000000000000000A9, A00000000000000000000A10, A00000000000000000000A11, A00000000000000000000A12, A00000000000000000000A13, A00000000000000000000A14, A000000000000000000000A6, A000000000000000000000A7);
 			path = VVindowsConnect;
 			sourceTree = "<group>";
 		};
@@ -91,6 +99,8 @@
 		E000000000000000000000E3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = VVindowsConnect/VVindowsConnect.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -98,6 +108,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = VVindowsConnect/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = vindOS;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.golfcore.vvindowsconnect;
 				PRODUCT_NAME = VVindowsConnect;
@@ -107,6 +118,8 @@
 		E000000000000000000000E4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = VVindowsConnect/VVindowsConnect.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -114,6 +127,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = VVindowsConnect/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = vindOS;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.golfcore.vvindowsconnect;
 				PRODUCT_NAME = VVindowsConnect;
@@ -135,7 +149,7 @@
 		F000000000000000000000F3 /* VVindowsConnect */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F000000000000000000000F2;
-			buildPhases = (D000000000000000000000D1, D000000000000000000000D2);
+			buildPhases = (D000000000000000000000D1, D000000000000000000000D2, D000000000000000000000D3);
 			buildRules = ();
 			dependencies = ();
 			name = VVindowsConnect;
