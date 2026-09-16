@@ -50,8 +50,8 @@ struct HomeView: View {
 
     private func connect(_ pair: SavedPair) {
         desktop.connect(to: pair)
-        if !desktop.windowOpen { openWindow(id: "desktop") }
-        dismissWindow()
+        openWindow(id: "desktop")
+        dismissWindow(id: "home")
     }
 
     private var status: String {

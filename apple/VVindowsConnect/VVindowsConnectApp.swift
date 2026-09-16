@@ -22,7 +22,7 @@ struct VVindowsConnectApp: App {
             .windowResizability(.contentSize)
         #if !targetEnvironment(simulator)
         ImmersiveSpace(foveatedStreaming: connection.session)
-            .immersionStyle(selection: .constant(.progressive), in: .progressive)
+            .immersionStyle(selection: .constant(.progressive(0.1...1, initialAmount: 1)), in: .progressive(0.1...1, initialAmount: 1))
         #endif
     }
 }

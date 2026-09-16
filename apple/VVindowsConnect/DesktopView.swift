@@ -12,6 +12,11 @@ struct DesktopView: View {
         return CGSize(width: 16, height: 9)
     }
 
+    private func toHome() {
+        openWindow(id: "home")
+        dismissWindow(id: "desktop")
+    }
+
     var body: some View {
         ZStack {
             VideoView(stream: desktop.video, frameSize: frameSize) { desktop.send($0) }
@@ -23,11 +28,8 @@ struct DesktopView: View {
         }
         .aspectRatio(16 / 9, contentMode: .fit)
         .onAppear {
+            if desktop.windowOpen || desktop.state == .idle { return toHome() }
             desktop.windowOpen = true
-            if desktop.state == .idle {
-                openWindow(id: "home")
-                dismissWindow()
-            }
         }
         .onDisappear {
             desktop.windowOpen = false
@@ -37,13 +39,14 @@ struct DesktopView: View {
             if case .disconnected = status, desktop.immersion == .on { desktop.leaveImmersive() }
         }
         .onChange(of: desktop.state) { _, state in
-            guard state == .idle else { return }
-            openWindow(id: "home")
-            dismissWindow()
+            if state == .idle { toHome() }
         }
         .ornament(attachmentAnchor: .scene(.top)) {
             HStack(spacing: 16) {
-                Button("Disconnect") { desktop.disconnect() }
+                Button("Disconnect") {
+                    desktop.disconnect()
+                    toHome()
+                }
                 if case .streaming = desktop.state {
                     switch desktop.immersion {
                     case .off: Button("Fullscreen") { desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
