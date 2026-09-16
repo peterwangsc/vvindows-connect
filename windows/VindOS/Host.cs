@@ -190,7 +190,7 @@ sealed class Host : IDisposable
         _session = null;
         _xr?.Dispose();
         _xr = null;
-        _manager.StopService();
+        _ = Task.Run(_manager.StopService);
         Idle();
     }
 
@@ -199,7 +199,7 @@ sealed class Host : IDisposable
         _session = null;
         _xr?.Dispose();
         _xr = null;
-        _manager.StopService();
+        _ = Task.Run(_manager.StopService);
         if (_immersive) { _immersive = false; await _desktop.EndImmersiveAsync(); }
         Idle();
         if (_armed) Arm();
