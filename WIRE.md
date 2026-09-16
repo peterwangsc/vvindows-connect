@@ -101,3 +101,19 @@ had arrived. If the headset's Apple connect fails it sends `windowed` at once.
 The desktop TLS stream stays open throughout and keeps carrying INPUT records;
 the desktop window stays open as the input surface. CloudXR media is not
 encrypted by the vendor; the desktop stream is.
+
+## Games
+
+A game runs inside the immersive session: the host ends its own quad session
+and launches one owned game process whose OpenXR session takes over the same
+stream. No new connection, port or trust.
+
+| `type` | direction | fields | meaning |
+| --- | --- | --- | --- |
+| `games` | host → headset | `games`: list of `{id, name}` | sent once after `stream`; what the host found installed, possibly empty |
+| `game` | headset → host | `id` | start this game; only while immersive |
+| `game` | host → headset | `id`, `running`, optional `reason` | `running: true` once the process is up; `running: false` when it exits or fails, after which the host's quad session is back |
+
+| `recenter` | headset → host | | while a game runs: the host sends the game's recenter chord to its window (Assetto Corsa: Ctrl+Space); no reply |
+
+`windowed` while a game runs kills the game first, then returns as usual.

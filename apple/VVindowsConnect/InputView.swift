@@ -1,8 +1,10 @@
+import SwiftUI
 import UIKit
 
 final class InputView: UIView, UIKeyInput {
     var send: ((Input) -> Void)?
     var frameSize = CGSize(width: 16, height: 9)
+    var pointer = true
     private var scroll = CGPoint.zero
     var hasText: Bool { false }
     override var canBecomeFirstResponder: Bool { true }
@@ -28,6 +30,7 @@ final class InputView: UIView, UIKeyInput {
     }
 
     private func point(_ location: CGPoint) -> (Int32, Int32)? {
+        guard pointer else { return nil }
         let scale = min(bounds.width / frameSize.width, bounds.height / frameSize.height)
         let shown = CGSize(width: frameSize.width * scale, height: frameSize.height * scale)
         let origin = CGPoint(x: (bounds.width - shown.width) / 2, y: (bounds.height - shown.height) / 2)
@@ -115,4 +118,16 @@ enum Input {
         for value in [a, b, c] { withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) } }
         return data
     }
+}
+
+struct KeyboardView: UIViewRepresentable {
+    let send: (Input) -> Void
+
+    func makeUIView(context: Context) -> InputView {
+        let view = InputView()
+        view.pointer = false
+        return view
+    }
+
+    func updateUIView(_ view: InputView, context: Context) { view.send = send }
 }

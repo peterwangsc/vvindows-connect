@@ -19,11 +19,21 @@ struct HomeView: View {
             .padding(32)
             .navigationTitle("vindOS")
             .onAppear {
+                #if targetEnvironment(simulator)
+                SimulatorScript.actions["closehome"] = { dismissWindow(id: "home") }
+                #endif
                 connection.homeWindows += 1
                 if connection.homeWindows > 1 { return dismissWindow() }
                 if desktop.desktopWindows > 0, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
+            .onChange(of: desktop.session.status) { _, status in
+                guard status == .connected, desktop.immersion == .on else { return }
+                Task {
+                    try? await Task.sleep(for: .seconds(1))
+                    if desktop.immersion == .on { dismissWindow(id: "home") }
+                }
+            }
             .task {
                 #if targetEnvironment(simulator)
                 SimulatorScript.run(connection, desktop, connect: { connection.pair.map(connect) }, disconnect: desktop.disconnect)
@@ -68,6 +78,21 @@ struct HomeView: View {
         case (.pairing, _): Button("Cancel") { connection.cancelPairing() }
         case (_, nil): Button("Pair") { connection.startPairing() }.buttonStyle(.borderedProminent)
         case (_, _?) where desktop.immersion != .off:
+            switch desktop.game {
+            case .starting(let game): ProgressView("Starting \(game.name)…")
+            case .running(let game):
+                Text("Playing \(game.name)").foregroundStyle(.secondary)
+                Button("Recenter") { desktop.recenter() }
+                KeyboardView { desktop.send($0) }
+                    .frame(height: 60)
+                    .overlay { Text("Tap here, then type to drive").foregroundStyle(.secondary).allowsHitTesting(false) }
+                    .glassBackgroundEffect()
+            case .failed(let reason): Text(reason).foregroundStyle(.secondary)
+            case .none: EmptyView()
+            }
+            if case .running = desktop.game {} else if case .starting = desktop.game {} else {
+                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) } }
+            }
             Button("Windowed") { desktop.leaveImmersive() }.buttonStyle(.borderedProminent)
         case (_, let pair?):
             Button("Connect") { connect(pair) }
