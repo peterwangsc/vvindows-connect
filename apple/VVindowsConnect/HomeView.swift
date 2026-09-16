@@ -59,6 +59,7 @@ struct HomeView: View {
             Button("Connect") {
                 desktop.connect(to: pair)
                 if !desktop.windowOpen { openWindow(id: "desktop") }
+                dismissWindow()
             }
             .buttonStyle(.borderedProminent)
             .disabled(desktop.state == .connecting)

@@ -31,12 +31,14 @@ struct DesktopView: View {
             desktop.windowOpen = false
             desktop.disconnect()
         }
+        .onChange(of: desktop.state) { _, state in
+            guard state == .idle else { return }
+            openWindow(id: "home")
+            dismissWindow()
+        }
         .ornament(attachmentAnchor: .scene(.top)) {
             HStack(spacing: 16) {
-                Button("Disconnect") {
-                    desktop.disconnect()
-                    dismissWindow()
-                }
+                Button("Disconnect") { desktop.disconnect() }
                 Text(desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
                     .font(.caption.monospaced())
             }
