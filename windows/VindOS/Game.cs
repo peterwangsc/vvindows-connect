@@ -6,21 +6,19 @@ using System.Text;
 
 namespace VindOS;
 
-sealed record GameEntry(string Id, string Name, string Exe, string ExeSha256, string Bridge, string BridgeSha256, string ProcessName, ushort[] RecenterScans);
-
 sealed class Game : IDisposable
 {
-    public static readonly GameEntry[] Registry =
-    [
-        new("assetto", "Assetto Corsa",
-            @"C:\Program Files (x86)\Steam\steamapps\common\assettocorsa\acs.exe", "0df569c840f8303f7018f7891085e3a4c22cf93fb19327c6a0b85325cea23fd1",
-            @"C:\Program Files (x86)\Steam\steamapps\common\assettocorsa\system\x64\openvr_api.dll", "827ad85f3606a4dc4a8f5561a8ca69e4c6c1b5d2b9cd3315a461b9270b08242c",
-            "acs", [0x1D, 0x39]),
-    ];
+    static readonly string BridgeDll = Path.Combine(AppContext.BaseDirectory, "opencomposite", "openvr_api.dll");
+    const string OriginalSuffix = ".vindos-original";
+    static readonly ushort[] RecenterScans = [0x1D, 0x39];
 
     [DllImport("kernel32.dll", SetLastError = true)] static extern nint CreateJobObjectW(nint attributes, string? name);
     [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetInformationJobObject(nint job, int infoClass, ref JobLimits info, int size);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool QueryInformationJobObject(nint job, int infoClass, ref JobAccounting info, int size, nint returned);
     [DllImport("kernel32.dll", SetLastError = true)] static extern bool AssignProcessToJobObject(nint job, nint process);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool TerminateJobObject(nint job, uint exitCode);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool IsProcessInJob(nint process, nint job, out bool result);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern nint OpenProcess(uint access, bool inherit, uint pid);
     [DllImport("kernel32.dll", SetLastError = true)] static extern bool CloseHandle(nint handle);
     [DllImport("user32.dll")] static extern nint GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassNameW(nint hwnd, StringBuilder name, int max);
@@ -35,14 +33,35 @@ sealed class Game : IDisposable
         public nuint ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
     }
 
-    public static IEnumerable<GameEntry> Installed() => Registry.Where(g => Matches(g) is null);
+    [StructLayout(LayoutKind.Sequential)]
+    struct JobAccounting { public long TotalUserTime, TotalKernelTime, ThisPeriodTotalUserTime, ThisPeriodTotalKernelTime; public uint TotalPageFaultCount, TotalProcesses, ActiveProcesses, TotalTerminatedProcesses; }
 
-    public static string? Matches(GameEntry g)
+    public static string? Bridge(GameEntry entry)
     {
-        if (!File.Exists(g.Exe)) return "not installed";
-        if (Sha256(g.Exe) != g.ExeSha256) return "game binary differs from the verified build";
-        if (!File.Exists(g.Bridge) || Sha256(g.Bridge) != g.BridgeSha256) return "OpenXR bridge missing or differs from the verified build";
-        return null;
+        if (entry.Api != "openvr") return null;
+        if (!File.Exists(BridgeDll)) throw new InvalidOperationException("The OpenComposite bridge is missing from the vindOS install.");
+        var expected = Sha256(BridgeDll);
+        string? dir = null;
+        foreach (var dll in Directory.EnumerateFiles(entry.Dir, "openvr_api.dll", SearchOption.AllDirectories).Where(Is64Bit))
+        {
+            if (Sha256(dll) != expected)
+            {
+                if (!File.Exists(dll + OriginalSuffix)) File.Copy(dll, dll + OriginalSuffix);
+                File.Copy(BridgeDll, dll, true);
+                Log.Write($"game {entry.Id} bridged {Path.GetRelativePath(entry.Dir, dll)}");
+            }
+            dir ??= Path.GetDirectoryName(dll);
+        }
+        return dir ?? throw new InvalidOperationException($"{entry.Name} has no 64-bit openvr_api.dll to bridge.");
+    }
+
+    static bool Is64Bit(string pe)
+    {
+        using var f = File.OpenRead(pe);
+        Span<byte> b = stackalloc byte[4];
+        f.Position = 0x3C; f.ReadExactly(b);
+        f.Position = BitConverter.ToInt32(b) + 4; f.ReadExactly(b[..2]);
+        return BitConverter.ToUInt16(b) == 0x8664;
     }
 
     static string Sha256(string path)
@@ -53,28 +72,36 @@ sealed class Game : IDisposable
 
     readonly nint _job;
     readonly Process _process;
+    readonly Timer _watch;
     public GameEntry Entry { get; }
+    public bool Immersive { get; }
     public event Action<int>? Exited;
+    public event Action<string>? VrLoaded;
+    public event Action? VrEnded;
+    int _vrPid;
 
-    public Game(GameEntry entry)
+    public Game(GameEntry entry, bool immersive)
     {
         Entry = entry;
-        var reason = Matches(entry);
-        if (reason is not null) throw new InvalidOperationException(reason);
-        if (Process.GetProcessesByName(entry.ProcessName).Length > 0) throw new InvalidOperationException($"{entry.Name} is already running.");
-        var dir = Path.GetDirectoryName(entry.Exe)!;
-        var start = new ProcessStartInfo(entry.Exe) { WorkingDirectory = dir, UseShellExecute = false };
-        start.Environment["XR_RUNTIME_JSON"] = StreamManager.RuntimeJson;
-        start.Environment["PATH"] = Path.GetDirectoryName(entry.Bridge) + ";" + Environment.GetEnvironmentVariable("PATH");
+        Immersive = immersive;
+        if (!File.Exists(entry.Exe)) throw new InvalidOperationException($"{entry.Name} is not installed.");
+        var bridgeDir = immersive ? Bridge(entry) : null;
+        var start = new ProcessStartInfo(entry.Exe) { WorkingDirectory = entry.WorkingDir, UseShellExecute = false };
+        if (immersive) start.Environment["XR_RUNTIME_JSON"] = StreamManager.RuntimeJson;
+        if (bridgeDir is not null) start.Environment["PATH"] = bridgeDir + ";" + Environment.GetEnvironmentVariable("PATH");
         foreach (var name in new[] { "PYTHONHOME", "PYTHONPATH", "PYTHONOPTIMIZE" }) start.Environment.Remove(name);
         _job = CreateJobObjectW(0, null);
         var limits = new JobLimits { LimitFlags = 0x2000 };
         SetInformationJobObject(_job, 9, ref limits, Marshal.SizeOf<JobLimits>());
         _process = Process.Start(start)!;
         AssignProcessToJobObject(_job, _process.Handle);
-        _process.EnableRaisingEvents = true;
-        _process.Exited += (_, _) => { Log.Write($"game {entry.Id} exited {_process.ExitCode}"); Exited?.Invoke(_process.ExitCode); };
-        Log.Write($"game {entry.Id} started pid {_process.Id}");
+        Log.Write($"game {entry.Id} started {Path.GetFileName(entry.Exe)} pid {_process.Id} {(immersive ? "immersive" : "desktop")}");
+        _watch = new Timer(_ =>
+        {
+            if (!Running) { _watch!.Dispose(); var code = _process.HasExited ? _process.ExitCode : 0; Log.Write($"game {entry.Id} exited {code}"); Exited?.Invoke(code); return; }
+            if (_vrPid == 0) { if (VrModule() is var (module, pid) && pid != 0) { _vrPid = pid; Log.Write($"game {entry.Id} loaded {module}"); VrLoaded?.Invoke(module); } }
+            else if (!InJob((uint)_vrPid)) { Log.Write($"game {entry.Id} vr process {_vrPid} ended"); _vrPid = 0; VrEnded?.Invoke(); }
+        }, null, 250, 250);
     }
 
     public static string Foreground()
@@ -88,19 +115,57 @@ sealed class Game : IDisposable
         return $"class={name} process={process}";
     }
 
-    public bool Running => !_process.HasExited;
+    (string, int) VrModule()
+    {
+        foreach (var p in Process.GetProcesses())
+        {
+            using (p)
+            {
+                if (!InJob((uint)p.Id)) continue;
+                try
+                {
+                    foreach (ProcessModule m in p.Modules)
+                        if (m.ModuleName.Equals("openxr_loader.dll", StringComparison.OrdinalIgnoreCase) || m.ModuleName.Equals("openvr_api.dll", StringComparison.OrdinalIgnoreCase))
+                            return ($"{m.ModuleName} in {p.ProcessName} pid {p.Id}", p.Id);
+                }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { }
+            }
+        }
+        return ("", 0);
+    }
+
+    bool InJob(uint pid)
+    {
+        var h = OpenProcess(0x1000, false, pid);
+        if (h == 0) return false;
+        var owns = IsProcessInJob(h, _job, out var inJob) && inJob;
+        CloseHandle(h);
+        return owns;
+    }
+
+    public bool Running
+    {
+        get
+        {
+            var info = new JobAccounting();
+            return QueryInformationJobObject(_job, 1, ref info, Marshal.SizeOf<JobAccounting>(), 0) && info.ActiveProcesses > 0;
+        }
+    }
 
     public bool Recenter()
     {
         GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
-        if (pid != _process.Id) return false;
-        Input.Chord(Entry.RecenterScans);
+        if (!InJob(pid)) return false;
+        Input.Chord(RecenterScans);
         return true;
     }
 
+    public void Stop() => TerminateJobObject(_job, 1);
+
     public void Dispose()
     {
-        if (!_process.HasExited) { try { _process.Kill(true); } catch (InvalidOperationException) { } }
+        _watch.Dispose();
+        TerminateJobObject(_job, 1);
         CloseHandle(_job);
         _process.Dispose();
     }

@@ -18,5 +18,6 @@
     <None Include="native\*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
     <None Include="..\vendor\NvStreamManagerClient.dll" CopyToOutputDirectory="PreserveNewest" Link="NvStreamManagerClient.dll" />
     <None Include="..\vendor\Server\**\*" CopyToOutputDirectory="PreserveNewest" Link="Server\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="..\vendor\opencomposite\openvr_api.dll" CopyToOutputDirectory="PreserveNewest" Link="opencomposite\openvr_api.dll" />
   </ItemGroup>
 </Project>

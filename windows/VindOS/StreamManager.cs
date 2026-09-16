@@ -95,6 +95,7 @@ sealed class StreamManager : IDisposable
             _serviceRunning = true;
             if (r != 0) { nv_rpc_client_stop_cxr_service(_client); _serviceRunning = false; Check(r); }
             while (!RuntimeRunning()) await Task.Delay(100, ct);
+            _ = Task.Run(async () => { while (_serviceRunning) { LogStatus(); await Task.Delay(500, ct); } }, ct);
         }
         finally { _gate.Release(); }
     }
@@ -115,6 +116,17 @@ sealed class StreamManager : IDisposable
     readonly SemaphoreSlim _gate = new(1, 1);
 
     public bool RuntimeRunning() => nv_rpc_client_get_cxr_service_status(_client, out var s) == 0 && s.RuntimeRunning;
+
+    (bool, bool, bool) _lastStatus;
+
+    public void LogStatus()
+    {
+        if (nv_rpc_client_get_cxr_service_status(_client, out var s) != 0) return;
+        var cur = (s.RuntimeRunning, s.AppConnected, s.ClientConnected);
+        if (cur == _lastStatus) return;
+        _lastStatus = cur;
+        Log.Write($"runtime status running={s.RuntimeRunning} app={s.AppConnected} client={s.ClientConnected}");
+    }
 
     static void Check(int result)
     {

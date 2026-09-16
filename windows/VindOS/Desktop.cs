@@ -25,7 +25,6 @@ sealed class Desktop : IDisposable
     public event Action<string>? StatusChanged;
     public Func<Task<string?>>? ImmersiveRequested;
     public Func<Task>? DesktopRequested;
-    public Func<string, Task<string?>>? GameRequested;
     public Func<bool>? RecenterRequested;
 
     readonly X509Certificate2 _certificate;
@@ -118,7 +117,6 @@ sealed class Desktop : IDisposable
             }
             var (w, h) = await size.Task.WaitAsync(TimeSpan.FromSeconds(5), _cts.Token);
             Send(new { v = 1, type = "stream", width = w, height = h, fps = Fps });
-            Send(new { v = 1, type = "games", games = Game.Installed().Select(g => new { id = g.Id, name = g.Name }).ToArray() });
             _announced = true;
             vindos_desktop_idr();
             Log.Write($"desktop stream sent {w}x{h}");
@@ -155,12 +153,6 @@ sealed class Desktop : IDisposable
                                 break;
                             case "recenter":
                                 Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "applied" : "ignored: nothing to recenter")}");
-                                break;
-                            case "game":
-                                var id = doc.RootElement.GetProperty("id").GetString() ?? "";
-                                var failure = !_immersive ? "not in immersive mode" : GameRequested is null ? "unsupported" : await GameRequested(id);
-                                if (failure is not null) Log.Write($"game {id} refused: {failure}");
-                                if (failure is null) Send(new { v = 1, type = "game", id, running = true }); else Send(new { v = 1, type = "game", id, running = false, reason = failure });
                                 break;
                         }
                     }
@@ -258,6 +250,12 @@ sealed class Desktop : IDisposable
         }
         vindos_desktop_idr();
         Send(new { v = 1, type = "windowed" });
+        return Task.CompletedTask;
+    }
+
+    public Task GameStartedAsync(string id)
+    {
+        if (_immersive) Send(new { v = 1, type = "game", id, running = true });
         return Task.CompletedTask;
     }
 
