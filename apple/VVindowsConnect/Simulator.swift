@@ -1,10 +1,22 @@
 #if targetEnvironment(simulator)
 import Foundation
+import Network
 import Observation
+import SwiftUI
 
 @MainActor @Observable
 final class FoveatedStreamingSession {
-    struct Endpoint { static let systemDiscovered = Endpoint() }
+    struct Endpoint {
+        static let systemDiscovered = Endpoint()
+        static func local(ipAddress: any IPAddress, port: NWEndpoint.Port) -> Endpoint { Endpoint() }
+    }
+    struct ImmersivePresentationBehaviors: ExpressibleByArrayLiteral {
+        init(arrayLiteral: ImmersivePresentationBehaviors...) {}
+        init() {}
+        static func presentOnConnect(_ open: OpenImmersiveSpaceAction) -> Self { .init() }
+        static func dismissOnDisconnect(_ dismiss: DismissImmersiveSpaceAction) -> Self { .init() }
+    }
+    var immersivePresentationBehaviors = ImmersivePresentationBehaviors()
     struct DisconnectReason: Error, Equatable { static let unavailable = DisconnectReason() }
     enum Status: Equatable { case initialized, connecting, connected, disconnected(DisconnectReason) }
 

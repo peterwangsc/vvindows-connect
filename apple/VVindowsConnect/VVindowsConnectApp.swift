@@ -5,8 +5,14 @@ import FoveatedStreaming
 
 @main
 struct VVindowsConnectApp: App {
-    @State private var connection = Connection()
-    @State private var desktop = Desktop()
+    @State private var connection: Connection
+    @State private var desktop: Desktop
+
+    init() {
+        let connection = Connection()
+        _connection = State(initialValue: connection)
+        _desktop = State(initialValue: Desktop(session: connection.session))
+    }
 
     var body: some Scene {
         WindowGroup(id: "home") { HomeView(connection: connection, desktop: desktop) }

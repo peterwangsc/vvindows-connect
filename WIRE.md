@@ -85,3 +85,19 @@ out-of-range value or a record that is not 16 bytes. Adjacent moves may be
 coalesced; nothing is reordered across a button, key or wheel. The headset
 sends at most one move per displayed frame. Neither side logs coordinates,
 keys or text.
+
+## Immersive
+
+Fullscreen reuses the saved pair. Nothing new is trusted.
+
+| `type` | direction | fields | meaning |
+| --- | --- | --- | --- |
+| `immersive` | headset → host | | start immersive: the host pauses window video, starts the CloudXR service and its own OpenXR session drawing the desktop on a quad, then replies |
+| `immersive` | host → headset | `port` | the Apple session-management TCP port; the headset connects its Foveated Streaming session there with the saved ClientID and the host acknowledges with the fingerprint, sends no `paired`, and proceeds to `MediaStreamIsReady` |
+| `windowed` | both | | end immersive: the host ends its OpenXR session, stops the service, resumes window video with an IDR and replies `windowed`; the headset disconnects its Apple session |
+
+An Apple session that reports `DISCONNECTED` ends immersive as if `windowed`
+had arrived. If the headset's Apple connect fails it sends `windowed` at once.
+The desktop TLS stream stays open throughout and keeps carrying INPUT records;
+the desktop window stays open as the input surface. CloudXR media is not
+encrypted by the vendor; the desktop stream is.

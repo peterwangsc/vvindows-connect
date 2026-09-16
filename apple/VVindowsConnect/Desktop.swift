@@ -2,17 +2,41 @@ import CryptoKit
 import Foundation
 import Network
 import Observation
+import SwiftUI
+#if canImport(FoveatedStreaming)
+import FoveatedStreaming
+#endif
 
 @MainActor @Observable
 final class Desktop {
     enum State: Equatable { case idle, connecting, streaming(width: Int, height: Int), failed(String) }
+    enum Immersion: Equatable { case off, starting, on }
 
+    let session: FoveatedStreamingSession
     private(set) var state = State.idle
+    private(set) var immersion = Immersion.off
+    private var hostAddress: (any IPAddress)?
     var windowOpen = false
     private(set) var sent = [UInt8: Int]()
     let video = VideoStream()
     private var connection: NWConnection?
     private var browser: NWBrowser?
+
+    init(session: FoveatedStreamingSession) { self.session = session }
+
+    func enterImmersive(open: OpenImmersiveSpaceAction, dismiss: DismissImmersiveSpaceAction) {
+        guard case .streaming = state, immersion == .off else { return }
+        immersion = .starting
+        session.immersivePresentationBehaviors = [.presentOnConnect(open), .dismissOnDisconnect(dismiss)]
+        connection?.send(content: Frame.control(["v": 1, "type": "immersive"]), completion: .idempotent)
+    }
+
+    func leaveImmersive() {
+        guard immersion != .off else { return }
+        immersion = .off
+        connection?.send(content: Frame.control(["v": 1, "type": "windowed"]), completion: .idempotent)
+        Task { await session.disconnect() }
+    }
 
     func connect(to pair: SavedPair) {
         disconnect()
@@ -42,6 +66,7 @@ final class Desktop {
     }
 
     func disconnect() {
+        if immersion != .off { leaveImmersive() }
         browser?.cancel()
         browser = nil
         if let connection {
@@ -69,6 +94,13 @@ final class Desktop {
                 guard let self, self.connection === connection else { return }
                 switch change {
                 case .ready:
+                    if case .hostPort(let host, _)? = connection.currentPath?.remoteEndpoint {
+                        switch host {
+                        case .ipv4(let a): self.hostAddress = a
+                        case .ipv6(let a): self.hostAddress = a
+                        default: break
+                        }
+                    }
                     connection.send(content: Frame.control(["v": 1, "type": "hello", "token": pair.desktop.token]), completion: .idempotent)
                     self.receive(connection)
                 case .failed(let error): self.fail(String(describing: error))
@@ -103,6 +135,15 @@ final class Desktop {
             guard let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any], let kind = json["type"] as? String else { return }
             switch kind {
             case "stream": state = .streaming(width: json["width"] as? Int ?? 0, height: json["height"] as? Int ?? 0)
+            case "immersive":
+                guard immersion == .starting, let host = hostAddress, let port = (json["port"] as? Int).flatMap({ NWEndpoint.Port(rawValue: UInt16($0)) }) else { return leaveImmersive() }
+                Task {
+                    do {
+                        try await session.connect(endpoint: .local(ipAddress: host, port: port))
+                        if immersion == .starting { immersion = .on }
+                    } catch { leaveImmersive() }
+                }
+            case "windowed": if immersion == .on { leaveImmersive() }
             case "bye": disconnect()
             default: break
             }
