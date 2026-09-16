@@ -9,16 +9,34 @@ namespace VindOS;
 public partial class MainWindow : Window
 {
     Host? _host;
-    bool _armed;
+    bool _armed, _quit;
     readonly DispatcherTimer _steam = new() { Interval = TimeSpan.FromSeconds(5) };
+    readonly System.Windows.Forms.NotifyIcon _tray = new() { Text = "vindOS", Visible = true };
 
     public MainWindow()
     {
         InitializeComponent();
         VersionText.Text = App.Version;
-        Loaded += (_, _) => Start();
-        Closed += (_, _) => { _steam.Stop(); _host?.Dispose(); };
+        _tray.Icon = new System.Drawing.Icon(System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/vindOS.ico")).Stream);
+        _tray.DoubleClick += (_, _) => Restore();
+        _tray.ContextMenuStrip = new System.Windows.Forms.ContextMenuStrip();
+        _tray.ContextMenuStrip.Items.Add("Open vindOS", null, (_, _) => Restore());
+        _tray.ContextMenuStrip.Items.Add("Quit", null, (_, _) => { _quit = true; Close(); });
+        AutostartBox.IsChecked = Autostart.Enabled;
+        Loaded += (_, _) => { Start(); if (Environment.GetCommandLineArgs().Contains("--minimized")) Hide(); };
+        Closing += (_, e) => { if (_quit) return; e.Cancel = true; Hide(); };
+        Closed += (_, _) => { _tray.Dispose(); _steam.Stop(); _host?.Dispose(); };
+        new Thread(() => { while (App.Show.WaitOne()) Dispatcher.Invoke(Restore); }) { IsBackground = true }.Start();
     }
+
+    void Restore()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    void Autostart_Changed(object sender, RoutedEventArgs e) => Autostart.Enabled = AutostartBox.IsChecked == true;
 
     void Start()
     {

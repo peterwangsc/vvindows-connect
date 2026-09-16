@@ -182,8 +182,11 @@ session attached, the headset client stayed connected throughout.
 - Code signing: no Windows certificate or Artifact Signing account exists
   (Peter, 2026-09-15). An unsigned installer triggers SmartScreen's "unknown
   publisher" prompt; a certificate is Peter's purchase.
-- Not in v0: tray icon, autostart, installer. Uninstall must restore the
-  original `openvr_api.dll` files (`Bridge.Remove`) before removing the app.
+- Tray: closing the window keeps vindOS running in the tray (Open / Quit in
+  the tray menu); launching vindOS again restores the running instance's
+  window (named event `vindOS-show`). Settings > This PC: "Start vindOS when I
+  sign in (in the tray)" writes `HKCU\...\RunindOS` with `--minimized`.
+- Not in v0: MSIX, auto-update, telemetry.
 
 ## Installer
 

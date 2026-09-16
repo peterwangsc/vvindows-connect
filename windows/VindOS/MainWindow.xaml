@@ -138,6 +138,13 @@
                             <Button x:Name="ForgetButton" Content="Forget connection" Style="{StaticResource Secondary}" Margin="0,12,0,0" Click="Forget_Click" />
                         </StackPanel>
                     </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="This PC" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <CheckBox x:Name="AutostartBox" Content="Start vindOS when I sign in (in the tray)" Margin="0,4,0,0" Checked="Autostart_Changed" Unchecked="Autostart_Changed" />
+                            <TextBlock Text="Closing the window keeps vindOS running in the tray; Quit is in the tray menu." Style="{StaticResource Muted}" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="VR games" FontWeight="SemiBold" Margin="0,0,0,4" />
