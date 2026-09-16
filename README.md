@@ -28,8 +28,8 @@ Platform-owned permission UI remains platform-owned.
 
 ## Current milestone
 
-**Immersive: the same saved connection, explicit fullscreen and Apple Allow,
-one owned PC application, and reliable return to the desktop.**
+**Immersive games: one owned PC application streamed through the same
+session, and reliable return to the desktop.**
 
 Verified on hardware on 2026-09-16:
 
@@ -42,8 +42,10 @@ Verified on hardware on 2026-09-16:
 - Input: pointer, click, drag, trackpad scroll, physical keyboard and the
   visionOS keyboard all reach Windows. Windows running as administrator ignore
   injected input (UIPI); vindOS runs as a normal user.
+- Immersive: Fullscreen shows the desktop on a large screen in an immersive
+  space using the saved pair, no second scan. The Crown dials the
+  surroundings. Windowed, Apple's Exit, the Crown and the Home gesture all
+  return to the live desktop window.
 
 Not yet verified: any latency figure. The simulator build stubs the Apple
 streaming session and is for UI checks only; it is not a hardware result.
-
-Each step must leave a usable product.
