@@ -62,6 +62,13 @@ sealed class Input
         }
     }
 
+    public static void Chord(params ushort[] scans)
+    {
+        foreach (var s in scans) Send(Key(s, true));
+        Thread.Sleep(30);
+        foreach (var s in scans.Reverse()) Send(Key(s, false));
+    }
+
     public void ReleaseAll()
     {
         foreach (var b in _buttons) Send(Plain(b switch { 1 => LeftUp, 2 => RightUp, _ => MiddleUp }));

@@ -6,7 +6,7 @@ using System.Text;
 
 namespace VindOS;
 
-sealed record GameEntry(string Id, string Name, string Exe, string ExeSha256, string Bridge, string BridgeSha256, string ProcessName);
+sealed record GameEntry(string Id, string Name, string Exe, string ExeSha256, string Bridge, string BridgeSha256, string ProcessName, ushort[] RecenterScans);
 
 sealed class Game : IDisposable
 {
@@ -15,7 +15,7 @@ sealed class Game : IDisposable
         new("assetto", "Assetto Corsa",
             @"C:\Program Files (x86)\Steam\steamapps\common\assettocorsa\acs.exe", "0df569c840f8303f7018f7891085e3a4c22cf93fb19327c6a0b85325cea23fd1",
             @"C:\Program Files (x86)\Steam\steamapps\common\assettocorsa\system\x64\openvr_api.dll", "827ad85f3606a4dc4a8f5561a8ca69e4c6c1b5d2b9cd3315a461b9270b08242c",
-            "acs"),
+            "acs", [0x1D, 0x39]),
     ];
 
     [DllImport("kernel32.dll", SetLastError = true)] static extern nint CreateJobObjectW(nint attributes, string? name);
@@ -89,6 +89,14 @@ sealed class Game : IDisposable
     }
 
     public bool Running => !_process.HasExited;
+
+    public bool Recenter()
+    {
+        GetWindowThreadProcessId(GetForegroundWindow(), out var pid);
+        if (pid != _process.Id) return false;
+        Input.Chord(Entry.RecenterScans);
+        return true;
+    }
 
     public void Dispose()
     {

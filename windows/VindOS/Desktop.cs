@@ -27,6 +27,7 @@ sealed class Desktop : IDisposable
     public Func<Task<string?>>? ImmersiveRequested;
     public Func<Task>? DesktopRequested;
     public Func<string, Task<string?>>? GameRequested;
+    public Func<bool>? RecenterRequested;
 
     public async Task GameEndedAsync(string id, string reason)
     {
@@ -151,6 +152,9 @@ sealed class Desktop : IDisposable
                             case "windowed":
                                 if (DesktopRequested is not null) await DesktopRequested();
                                 await EndImmersiveAsync();
+                                break;
+                            case "recenter":
+                                Log.Write($"recenter {(RecenterRequested?.Invoke() == true ? "sent" : "ignored: game not in foreground")}");
                                 break;
                             case "game":
                                 var id = doc.RootElement.GetProperty("id").GetString() ?? "";

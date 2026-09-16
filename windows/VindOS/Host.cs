@@ -42,6 +42,7 @@ sealed class Host : IDisposable
         _desktop.ImmersiveRequested = BeginImmersiveAsync;
         _desktop.DesktopRequested = EndImmersiveAsync;
         _desktop.GameRequested = StartGameAsync;
+        _desktop.RecenterRequested = () => _game?.Recenter() == true;
         Log.Write($"games installed: {string.Join(",", Game.Installed().Select(g => g.Id))}");
         _listener.Start();
         _desktop.ApplePort = ((IPEndPoint)_listener.LocalEndpoint).Port;
