@@ -34,15 +34,15 @@ struct DesktopView: View {
             SimulatorScript.actions["closedesktop"] = { dismissWindow(id: "desktop") }
             #endif
             desktop.reopening = false
+            desktop.desktopWindows += 1
             if desktop.state == .idle { return toHome() }
-            desktop.windowOpen = true
             dismissWindow(id: "home")
         }
         .onDisappear {
-            desktop.windowOpen = false
+            desktop.desktopWindows -= 1
             Task {
                 try? await Task.sleep(for: .seconds(1))
-                if !desktop.windowOpen, desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
+                if desktop.desktopWindows == 0, desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
             }
         }
         .onChange(of: desktop.immersion) { _, immersion in

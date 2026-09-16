@@ -21,7 +21,7 @@ struct HomeView: View {
             .onAppear {
                 connection.homeWindows += 1
                 if connection.homeWindows > 1 { return dismissWindow() }
-                if desktop.windowOpen, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
+                if desktop.desktopWindows > 0, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
             }
             .onDisappear { connection.homeWindows -= 1 }
             .task {
