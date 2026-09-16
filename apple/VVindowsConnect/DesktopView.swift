@@ -61,7 +61,7 @@ struct DesktopView: View {
                     default: ProgressView()
                     }
                 }
-                Text(desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
+                Text("\(String(describing: desktop.session.status)) \(String(describing: desktop.immersion)) " + desktop.sent.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: " "))
                     .font(.caption.monospaced())
             }
             .padding(8)

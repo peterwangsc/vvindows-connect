@@ -141,6 +141,7 @@ final class Desktop {
             case "stream": state = .streaming(width: json["width"] as? Int ?? 0, height: json["height"] as? Int ?? 0)
             case "immersive":
                 guard immersion == .starting, let host = hostAddress, let port = (json["port"] as? Int).flatMap({ NWEndpoint.Port(rawValue: UInt16($0)) }) else { return leaveImmersive() }
+                immersion = .on
                 Task {
                     do { try await session.connect(endpoint: .local(ipAddress: host, port: port)) } catch { leaveImmersive() }
                 }
