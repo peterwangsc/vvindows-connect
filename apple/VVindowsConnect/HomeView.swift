@@ -17,6 +17,7 @@ struct HomeView: View {
                 action
             }
             .padding(32)
+            .controlSize(.extraLarge)
             .navigationTitle("vindOS")
             .onAppear {
                 #if targetEnvironment(simulator)
@@ -84,13 +85,12 @@ struct HomeView: View {
             case .failed(let reason): Text(reason).foregroundStyle(.secondary)
             case .none: EmptyView()
             }
-            Button("Recenter") { desktop.recenter() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
+            Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
             if case .running = desktop.game {} else if case .starting = desktop.game {} else {
-                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) } }
+                ForEach(desktop.games) { game in Button("Play \(game.name)") { desktop.play(game) }.buttonStyle(.borderedProminent) }
             }
-            Button("Windowed") { desktop.leaveImmersive() }.buttonStyle(.borderedProminent)
+            Button("Windowed") { desktop.leaveImmersive() }
+            Button("Hide") { dismissWindow(id: "home") }
         case (_, let pair?):
             Button("Connect") { connect(pair) }
             .buttonStyle(.borderedProminent)
