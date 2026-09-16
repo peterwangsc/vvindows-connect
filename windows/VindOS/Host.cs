@@ -1,0 +1,182 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text.Json;
+using QRCoder;
+
+namespace VindOS;
+
+sealed class Host : IDisposable
+{
+    sealed record Session(string Id, string ClientId, string Token, string Fingerprint, bool Reconnect);
+
+    public event Action<string>? StatusChanged;
+    public event Action<byte[]?>? QrChanged;
+    public event Action<Pair?>? PairChanged;
+
+    readonly string _serverId = PairStore.ServerId();
+    readonly TcpListener _listener = new(IPAddress.Any, 0);
+    readonly Bonjour _bonjour;
+    readonly StreamManager _manager = new();
+    readonly CancellationTokenSource _cts = new();
+    NetworkStream? _stream;
+    Session? _session;
+    XrSession? _xr;
+    bool _armed;
+
+    public Pair? Pair { get; private set; } = PairStore.LoadPair();
+    public string HostName => _bonjour.InstanceName;
+
+    public Host()
+    {
+        using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+            if (new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
+                throw new InvalidOperationException("Run vindOS without administrator rights. The OpenXR loader ignores the app's runtime selection when elevated.");
+        _listener.Start();
+        _bonjour = new Bonjour((ushort)((IPEndPoint)_listener.LocalEndpoint).Port);
+        Log.Write($"listening {_listener.LocalEndpoint} as {HostName}");
+        _ = ListenAsync();
+        Idle();
+    }
+
+    public void Arm()
+    {
+        _armed = true;
+        StatusChanged?.Invoke($"On Vision Pro, click Pair and choose {HostName}.");
+    }
+
+    public void Cancel()
+    {
+        _armed = false;
+        _ = DisconnectAsync();
+        Idle();
+    }
+
+    public void Forget()
+    {
+        PairStore.Forget();
+        Pair = null;
+        PairChanged?.Invoke(null);
+        _ = DisconnectAsync();
+        Idle();
+    }
+
+    void Idle()
+    {
+        QrChanged?.Invoke(null);
+        StatusChanged?.Invoke(Pair is null ? "Not paired." : $"Paired since {Pair.PairedAt.LocalDateTime:g}.");
+    }
+
+    async Task ListenAsync()
+    {
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                using var client = await _listener.AcceptTcpClientAsync(_cts.Token);
+                client.NoDelay = true;
+                using var stream = client.GetStream();
+                _stream = stream;
+                Log.Write($"tcp connect {client.Client.RemoteEndPoint}");
+                while (client.Connected) await HandleAsync(await Wire.ReadAsync(stream, _cts.Token));
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception e) { Log.Write($"tcp end {e.GetType().Name} {e.Message}"); }
+            finally
+            {
+                _stream = null;
+                if (_session is not null) await EndSessionAsync();
+            }
+        }
+    }
+
+    async Task HandleAsync(JsonDocument doc)
+    {
+        var root = doc.RootElement;
+        var ev = root.GetProperty("Event").GetString();
+        var sessionId = root.GetProperty("SessionID").GetString()!;
+        Log.Write($"recv {ev}");
+        if (ev != "RequestConnection" && _session?.Id != sessionId) { await SendAsync(Wire.RequestSessionDisconnect(sessionId)); return; }
+        switch (ev)
+        {
+            case "RequestConnection":
+                var clientId = root.GetProperty("ClientID").GetString()!;
+                var reconnect = Pair is not null && Pair.ClientId == clientId;
+                if (root.GetProperty("ProtocolVersion").GetString() != "1" || !(reconnect || _armed)) { await SendAsync(Wire.RequestSessionDisconnect(sessionId)); return; }
+                var token = _manager.ClientToken(clientId);
+                var fingerprint = _manager.Fingerprint();
+                _session = new Session(sessionId, clientId, token, fingerprint, reconnect);
+                await SendAsync(Wire.AcknowledgeConnection(sessionId, _serverId, reconnect ? fingerprint : null));
+                break;
+            case "RequestBarcodePresentation":
+                await SendAsync(Wire.AcknowledgeBarcodePresentation(sessionId));
+                using (var gen = new QRCodeGenerator())
+                    QrChanged?.Invoke(new PngByteQRCode(gen.CreateQrCode(Wire.Barcode(_session!.Token, _session.Fingerprint), QRCodeGenerator.ECCLevel.L)).GetGraphic(12));
+                StatusChanged?.Invoke("Scan this code with Vision Pro.");
+                break;
+            case "SessionStatusDidChange":
+                var status = root.GetProperty("Status").GetString();
+                Log.Write($"status {status}");
+                QrChanged?.Invoke(null);
+                if (status == Status.Waiting) await BeginStreamAsync();
+                else if (status == Status.Connected)
+                {
+                    if (!_session!.Reconnect)
+                    {
+                        PairStore.SavePair(Pair = new Pair(_session.ClientId, _serverId, _session.Fingerprint, DateTimeOffset.Now));
+                        _armed = false;
+                        PairChanged?.Invoke(Pair);
+                    }
+                    StatusChanged?.Invoke("Vision Pro connected.");
+                }
+                else if (status == Status.Disconnected) await EndSessionAsync();
+                break;
+        }
+    }
+
+    async Task BeginStreamAsync()
+    {
+        StatusChanged?.Invoke("Starting session…");
+        await _manager.StartServiceAsync(_cts.Token);
+        var ready = new TaskCompletionSource();
+        _xr = new XrSession(Wire.Paired(_serverId, HostName), (kind, value) =>
+        {
+            Log.Write($"xr {kind} {value}");
+            if (kind == XrSession.Kind.Stage && value == 7) ready.TrySetResult();
+            if (kind == XrSession.Kind.Sent) StatusChanged?.Invoke("Paired. Vision Pro is saving the connection.");
+        });
+        await Task.WhenAny(ready.Task, Task.Delay(TimeSpan.FromSeconds(5), _cts.Token));
+        if (_session is not null) await SendAsync(Wire.MediaStreamIsReady(_session.Id));
+    }
+
+    async Task EndSessionAsync()
+    {
+        _session = null;
+        _xr?.Dispose();
+        _xr = null;
+        _manager.StopService();
+        Idle();
+        if (_armed) Arm();
+        await Task.CompletedTask;
+    }
+
+    async Task DisconnectAsync()
+    {
+        if (_session is not null) await SendAsync(Wire.RequestSessionDisconnect(_session.Id));
+        await EndSessionAsync();
+    }
+
+    async Task SendAsync(object message)
+    {
+        if (_stream is null) return;
+        try { await Wire.SendAsync(_stream, message, _cts.Token); } catch (Exception e) { Log.Write($"send failed {e.Message}"); }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _xr?.Dispose();
+        _listener.Stop();
+        _bonjour.Dispose();
+        _manager.Dispose();
+    }
+}
