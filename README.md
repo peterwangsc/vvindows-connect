@@ -47,17 +47,18 @@ Verified on hardware on 2026-09-16:
   surroundings. Windowed, Apple's Exit, the Crown and the Home gesture all
   return to the live desktop window. A pinch on the surroundings shows or
   hides the control panel.
-- Games: the Windows client scans the Steam library once and shows a Play
-  button per VR title. Play while the headset is in Fullscreen launches the
-  game on our runtime and it takes over the big screen (Assetto Corsa: cockpit
-  rendered, driven with the PC's keyboard and mouse, Recenter fixes the seat
-  height). Play while windowed launches it flat on the desktop.
+- Games: the Windows client restarts Steam through vindOS once, so every game
+  Steam launches inherits our runtime; it lists the VR-capable titles it found
+  and installs the OpenVR bridge for them (originals kept, removable). In
+  Fullscreen you press Play inside Steam on the big screen; the game takes over
+  the screen, recenters, and the desktop returns when it quits (Assetto Corsa,
+  driven with the PC's keyboard and mouse). Windowed launches run flat.
+- Fullscreen panel: a pinch on the surroundings shows a panel in front of your
+  chest with Recenter and Windowed; a pinch on the surroundings hides it.
 
-Not yet verified: flat Play through the Windows client, and the quad
-returning after a game quits while its launcher stays open. The MacBook
-keyboard cannot reach the headset in Fullscreen because Mac Virtual Display is
-hidden inside immersive spaces; PC-attached input or a Bluetooth keyboard
-paired to the headset is required.
+The MacBook keyboard cannot reach the headset in Fullscreen because Mac
+Virtual Display is hidden inside immersive spaces; PC-attached input or a
+Bluetooth keyboard paired to the headset is required.
 
 Also not yet verified: any latency figure. The simulator build stubs the Apple
 streaming session and is for UI checks only; it is not a hardware result.
