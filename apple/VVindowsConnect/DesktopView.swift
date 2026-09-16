@@ -99,7 +99,7 @@ struct ImmersiveContent: View {
             content.add(shell)
             if let panel = attachments.entity(for: "hud") {
                 panel.isEnabled = false
-                panel.position = [0, -0.45, -0.9]
+                panel.position = [0, -0.3, -0.55]
                 hud = panel
             }
         } update: { content, _ in
