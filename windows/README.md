@@ -160,3 +160,27 @@ it cannot signal a game attaching while the quad is up; the module poll is the
 signal. Hand-off on that run: `acs.exe` loaded the bridge, the quad yielded
 74 ms later, `AppConnected` dropped and returned within 0.5 s as Assetto's
 session attached, the headset client stayed connected throughout.
+
+## v0 release notes for Windows
+
+- Version: `<Version>` in `VindOS.csproj` (0.1.0); shown in the window header
+  and in the startup log line.
+- Log: `%LOCALAPPDATA%indOS\log.txt` carries session events, process names,
+  counts and error messages. Audited 2026-09-16: no line writes a token, the
+  QR payload, a key, a certificate fingerprint or pointer coordinates.
+- NVIDIA CloudXR license (`vendor/Server/releases/6.2.3/LICENSE.txt`, same text
+  in Stream Manager 6.1.0): section 1.1(c) permits distributing portions of
+  the Software when the application has material additional functionality
+  (i), the distributable portions are accessed only by the application (ii),
+  developer tools stay internal (iv), the application's terms are consistent
+  with the license (v) and user privacy is protected (vi). vindOS is not the
+  only process that reaches the runtime: games launched from Steam open it
+  through OpenXR, which is the point of the product. Whether that satisfies
+  (ii) is a legal reading, not an engineering one; until Peter decides, the
+  installer treats the CloudXR files as user-supplied and the app reports
+  their absence as a setup state.
+- Code signing: no Windows certificate or Artifact Signing account exists
+  (Peter, 2026-09-15). An unsigned installer triggers SmartScreen's "unknown
+  publisher" prompt; a certificate is Peter's purchase.
+- Not in v0: tray icon, autostart, installer. Uninstall must restore the
+  original `openvr_api.dll` files (`Bridge.Remove`) before removing the app.

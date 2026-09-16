@@ -67,6 +67,8 @@ sealed class Host : IDisposable
         GamesChanged?.Invoke();
     }
 
+    string GameName(string id) => _games.FirstOrDefault(g => g.Id == id)?.Name ?? "A VR game";
+
     public string ApplyBridges()
     {
         try { Bridge.Apply(_games); } catch (Exception e) { Log.Write($"bridge apply failed {e.Message}"); return e.Message; }
@@ -113,7 +115,7 @@ sealed class Host : IDisposable
     void Idle()
     {
         QrChanged?.Invoke(null);
-        SetStatus(_desktop.Streaming ? "Vision Pro is viewing this desktop. Fullscreen on Vision Pro enters Immersive Mode." : Pair is null ? "Not paired. Click Pair here, then Pair on Vision Pro." : "Paired with Vision Pro. Click Connect on Vision Pro to view this desktop.");
+        SetStatus(_desktop.Streaming ? "Vision Pro is viewing this desktop. Fullscreen on Vision Pro puts it on the big screen." : Pair is null ? "Not paired. Click Pair here, then Pair on Vision Pro." : "Paired with Vision Pro. Click Connect on Vision Pro to view this desktop.");
     }
 
     async Task ListenAsync()
@@ -177,7 +179,7 @@ sealed class Host : IDisposable
                         _armed = false;
                         PairChanged?.Invoke(Pair);
                     }
-                    SetStatus(_immersive ? "Immersive Mode. Press Play in Steam on the big screen to start a VR game." : "Vision Pro connected.");
+                    SetStatus(_immersive ? "Fullscreen on Vision Pro. Press Play in Steam on the big screen to start a VR game." : "Vision Pro connected.");
                 }
                 else if (status == Status.Disconnected) await EndSessionAsync();
                 break;
@@ -233,7 +235,7 @@ sealed class Host : IDisposable
                 _watch.Started += (pid, name, id) => _ = YieldQuadAsync(id);
                 _watch.Ended += (pid, id) => _ = RestoreQuadAsync(id);
                 ImmersiveChanged?.Invoke(true);
-                SetStatus("Entering Immersive Mode. Waiting for Vision Pro.");
+                SetStatus("Entering Fullscreen. Waiting for Vision Pro.");
             }
             return error;
         }
@@ -249,7 +251,7 @@ sealed class Host : IDisposable
             _xr.Dispose();
             _xr = null;
             Log.Write($"quad yielded to {id}");
-            SetStatus("Playing on Vision Pro. The desktop returns when the game quits.");
+            SetStatus($"{GameName(id)} is running. The desktop returns when the game quits.");
         }
         finally { _lifecycle.Release(); }
         await _desktop.GameStartedAsync(id);
@@ -271,7 +273,7 @@ sealed class Host : IDisposable
             if (!_immersive || _xr is not null) return;
             var error = await StartXrAsync(null, true);
             Log.Write(error is null ? $"quad restored after {id}" : $"quad restart failed {error}");
-            SetStatus("Immersive Mode. Press Play in Steam on the big screen to start a VR game.");
+            SetStatus("Fullscreen on Vision Pro. Press Play in Steam on the big screen to start a VR game.");
         }
         finally { _lifecycle.Release(); }
         await _desktop.GameEndedAsync(id, "exited");

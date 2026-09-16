@@ -60,7 +60,7 @@ public partial class MainWindow : Window
         SteamTitle.Text = through switch { true => "Steam is ready for Vision Pro", false => "Steam needs a restart", null => "Steam is not running" };
         SteamText.Text = through switch
         {
-            true => "Games you start from Steam play on Vision Pro in Immersive Mode.",
+            true => "Games you start from Steam play on Vision Pro in Fullscreen.",
             false => "Restart Steam through vindOS once so games you start from Steam can play on Vision Pro.",
             null => "Start Steam through vindOS so games you start from Steam can play on Vision Pro.",
         };
