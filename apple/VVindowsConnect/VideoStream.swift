@@ -45,7 +45,8 @@ final class VideoStream {
         avcc.withUnsafeBytes { CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: avcc.count) }
         var sample: CMSampleBuffer?
         var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
-        CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sample)
+        var size = avcc.count
+        CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample)
         guard let sample, let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) as? [NSMutableDictionary] else { return }
         attachments.first?[kCMSampleAttachmentKey_DisplayImmediately] = true
         if layer.sampleBufferRenderer.status == .failed { layer.sampleBufferRenderer.flush() }
@@ -71,14 +72,19 @@ final class VideoStream {
 struct VideoView: UIViewRepresentable {
     let stream: VideoStream
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
+    func makeUIView(context: Context) -> LayerHostView {
         stream.layer.videoGravity = .resizeAspect
+        let view = LayerHostView()
         view.layer.addSublayer(stream.layer)
         return view
     }
 
-    func updateUIView(_ view: UIView, context: Context) {
-        stream.layer.frame = view.bounds
+    func updateUIView(_ view: LayerHostView, context: Context) {}
+}
+
+final class LayerHostView: UIView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.sublayers?.forEach { $0.frame = bounds }
     }
 }

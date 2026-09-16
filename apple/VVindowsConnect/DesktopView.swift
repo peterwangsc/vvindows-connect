@@ -13,6 +13,11 @@ struct DesktopView: View {
             }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
+        .onAppear { desktop.windowOpen = true }
+        .onDisappear {
+            desktop.windowOpen = false
+            desktop.disconnect()
+        }
         .ornament(attachmentAnchor: .scene(.bottom)) {
             Button("Disconnect", systemImage: "xmark") { desktop.disconnect() }
                 .labelStyle(.iconOnly)

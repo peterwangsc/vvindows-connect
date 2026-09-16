@@ -52,10 +52,10 @@ struct HomeView: View {
         case (_, let pair?):
             Button("Connect") {
                 desktop.connect(to: pair)
-                openWindow(id: "desktop")
+                if !desktop.windowOpen { openWindow(id: "desktop") }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(desktop.state != .idle)
+            .disabled(desktop.state == .connecting)
         }
     }
 }

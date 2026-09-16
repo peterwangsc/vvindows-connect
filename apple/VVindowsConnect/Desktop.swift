@@ -8,6 +8,7 @@ final class Desktop {
     enum State: Equatable { case idle, connecting, streaming(width: Int, height: Int), failed(String) }
 
     private(set) var state = State.idle
+    var windowOpen = false
     let video = VideoStream()
     private var connection: NWConnection?
     private var browser: NWBrowser?
@@ -63,7 +64,7 @@ final class Desktop {
                 case .ready:
                     connection.send(content: Frame.control(["v": 1, "type": "hello", "token": pair.desktop.token]), completion: .idempotent)
                     self.receive(connection)
-                case .failed(let error), .waiting(let error): self.fail(error.localizedDescription)
+                case .failed(let error): self.fail(String(describing: error))
                 default: break
                 }
             }
@@ -74,12 +75,12 @@ final class Desktop {
     private func receive(_ connection: NWConnection) {
         connection.receive(minimumIncompleteLength: 5, maximumLength: 5) { [weak self] head, _, _, error in
             guard let self, self.connection === connection else { return }
-            guard let head, head.count == 5 else { return self.fail(error?.localizedDescription ?? "The PC closed the connection.") }
+            guard let head, head.count == 5 else { return self.fail(error.map { String(describing: $0) } ?? "The PC closed the connection.") }
             let length = Int(head.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }.littleEndian) - 1
             guard length >= 0, length <= 16 << 20 else { return self.fail("The PC sent an oversized frame.") }
             connection.receive(minimumIncompleteLength: length, maximumLength: length) { body, _, _, error in
                 guard self.connection === connection else { return }
-                guard let body, body.count == length else { return self.fail(error?.localizedDescription ?? "The PC closed the connection.") }
+                guard let body, body.count == length else { return self.fail(error.map { String(describing: $0) } ?? "The PC closed the connection.") }
                 self.handle(type: head[4], body)
                 self.receive(connection)
             }
