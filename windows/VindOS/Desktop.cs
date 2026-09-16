@@ -130,14 +130,14 @@ sealed class Desktop : IDisposable
                     }
                 }
                 catch (Exception e) { Log.Write($"desktop read end {e.GetType().Name} {e.Message} after {sent} frames"); }
-                finally { input.ReleaseAll(); }
+                finally { input.ReleaseAll(); Log.Write($"desktop input {input.Summary}"); }
             });
             await foreach (var frame in frames.Reader.ReadAllAsync(_cts.Token))
             {
                 if (reader.IsCompleted) break;
                 await ssl.WriteAsync(frame, _cts.Token);
                 sent++;
-                if (Environment.TickCount64 - lastReport >= 1000) { lastReport = Environment.TickCount64; Log.Write($"desktop frames={sent}"); }
+                if (Environment.TickCount64 - lastReport >= 1000) { lastReport = Environment.TickCount64; Log.Write($"desktop frames={sent} {input.Summary}"); }
             }
             Log.Write($"desktop session end after {sent} frames");
         }

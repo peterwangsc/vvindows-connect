@@ -22,13 +22,19 @@ sealed class Input
     readonly int _left, _top, _width, _height;
     readonly HashSet<ushort> _keys = [];
     readonly HashSet<int> _buttons = [];
+    readonly int[] _counts = new int[6];
+    int _keyFailures;
+    uint _lastKeyError;
 
     public Input(int left, int top, int width, int height) => (_left, _top, _width, _height) = (left, top, width, height);
+
+    public string Summary => $"records move={_counts[1]} button={_counts[2]} wheel={_counts[3]} key={_counts[4]} text={_counts[5]} keyInjectFailures={_keyFailures} lastKeyError={_lastKeyError}";
 
     public void Apply(ReadOnlySpan<byte> record)
     {
         if (record.Length != 16 || BinaryPrimitives.ReadUInt16LittleEndian(record[2..]) != 0) throw new InvalidDataException("Malformed input record.");
         int kind = record[0], flags = record[1], a = BinaryPrimitives.ReadInt32LittleEndian(record[4..]), b = BinaryPrimitives.ReadInt32LittleEndian(record[8..]), c = BinaryPrimitives.ReadInt32LittleEndian(record[12..]);
+        if (kind is >= 1 and <= 5) _counts[kind]++;
         switch (kind)
         {
             case 1: Coordinates(a, b); Send(Mouse(a, b, 0)); break;
@@ -46,7 +52,7 @@ sealed class Input
             case 4:
                 if (a is < 0 or > 0xFF || Scan[a] == 0) throw new InvalidDataException("Unmapped key.");
                 if ((flags & 1) != 0) _keys.Add(Scan[a]); else _keys.Remove(Scan[a]);
-                Send(Key(Scan[a], (flags & 1) != 0));
+                if (Send(Key(Scan[a], (flags & 1) != 0)) == 0) { _keyFailures++; _lastKeyError = (uint)Marshal.GetLastWin32Error(); }
                 break;
             case 5:
                 if (a is < 0 or > 0x10FFFF or (>= 0xD800 and <= 0xDFFF)) throw new InvalidDataException("Bad scalar.");
@@ -83,7 +89,7 @@ sealed class Input
 
     static RawInput Text(char unit, bool down) => new() { Type = 1, U = { Key = new KeyInput { Scan = unit, Flags = Unicode | (down ? 0 : KeyUp) } } };
 
-    static void Send(RawInput input) => SendInput(1, [input], Marshal.SizeOf<RawInput>());
+    static uint Send(RawInput input) => SendInput(1, [input], Marshal.SizeOf<RawInput>());
 
     static ushort[] BuildScanTable()
     {
