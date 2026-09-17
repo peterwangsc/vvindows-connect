@@ -96,7 +96,9 @@ sealed class Input
 
     static RawInput Text(char unit, bool down) => new() { Type = 1, U = { Key = new KeyInput { Scan = unit, Flags = Unicode | (down ? 0 : KeyUp) } } };
 
-    static uint Send(RawInput input) => SendInput(1, [input], Marshal.SizeOf<RawInput>());
+    public static readonly int Size = Marshal.SizeOf<RawInput>();
+
+    static uint Send(RawInput input) => Elevated.Write(MemoryMarshal.AsBytes(new ReadOnlySpan<RawInput>(in input))) ? 1u : SendInput(1, [input], Size);
 
     static ushort[] BuildScanTable()
     {

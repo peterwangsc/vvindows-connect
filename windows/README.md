@@ -101,6 +101,23 @@ non-elevated for the OpenXR runtime selection). An app launched from an
 elevated terminal inherits that elevation, which is the usual way this shows
 up.
 
+Settings has "Control administrator windows", off by default. On, the first
+desktop session starts the same exe elevated as `--input <host pid> <pipe>`
+(one Windows approval per vindOS launch): no window, no host, no OpenXR. It
+serves one named pipe and calls `SendInput` for each 40-byte `INPUT` the host
+writes; `Input.cs` sends there instead of calling `SendInput` itself, and
+falls back to its own call, with one log line, when the pipe is absent or
+breaks. The pipe name is random per launch, its ACL allows only the signed-in
+user, the input process accepts only the host pid it was given and the host
+accepts only the process it started as the pipe's server. The input process
+logs to `input-log.txt`.
+
+This is a deliberate UIPI bypass. Anything that can run code inside vindOS
+can then drive administrator windows, and the installer is per-user, so the
+exe that gets elevated sits in a folder the signed-in user can write. Use the
+setting on a PC you control. The Windows approval prompt itself is on the
+secure desktop and cannot be answered from Vision Pro.
+
 Earlier hardware runs on 2026-09-16 verified click, drag, scroll, physical keyboard and visionOS keyboard input. Reverify the final release packages before launch.
 
 ## Immersive (WIRE.md v4)

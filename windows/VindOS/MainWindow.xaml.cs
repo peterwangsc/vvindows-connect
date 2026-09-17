@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         _tray.ContextMenuStrip.Items.Add("Open vindOS", null, (_, _) => Restore());
         _tray.ContextMenuStrip.Items.Add("Quit", null, (_, _) => { _quit = true; Close(); });
         AutostartBox.IsChecked = Autostart.Enabled;
+        ElevatedBox.IsChecked = Elevated.Enabled;
         Loaded += (_, _) => { Start(); if (Environment.GetCommandLineArgs().Contains("--minimized")) Hide(); };
         Closing += (_, e) => { if (_quit) return; e.Cancel = true; Hide(); };
         Closed += (_, _) => { _tray.Dispose(); _steam.Stop(); _host?.Dispose(); };
@@ -37,6 +38,14 @@ public partial class MainWindow : Window
     }
 
     void Autostart_Changed(object sender, RoutedEventArgs e) => Autostart.Enabled = AutostartBox.IsChecked == true;
+
+    void Elevated_Changed(object sender, RoutedEventArgs e)
+    {
+        var on = ElevatedBox.IsChecked == true;
+        if (on == Elevated.Enabled) return;
+        Elevated.Enabled = on;
+        if (on && _host?.Streaming == true) _ = Task.Run(Elevated.Start);
+    }
 
     void Start()
     {

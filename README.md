@@ -62,8 +62,9 @@ not certify every later commit or a new release package.
 
 Known limits:
 
-- Windows running as administrator do not accept vindOS input. Run vindOS
-  as a normal user.
+- Windows running as administrator do not accept vindOS input unless
+  "Control administrator windows" is on in the Windows app's Settings (off by
+  default; see `windows/README.md`). Run vindOS as a normal user either way.
 - Mac Virtual Display's keyboard path is unavailable while its display is
   hidden by an immersive space.
 - The windowed desktop uses pinned TLS 1.3. CloudXR immersive media is not

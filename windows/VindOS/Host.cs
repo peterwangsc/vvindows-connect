@@ -37,6 +37,7 @@ sealed class Host : IDisposable
     public string HostName => _bonjour.InstanceName;
     public IReadOnlyList<GameEntry> Games => _games;
     public bool Immersive => _immersive;
+    public bool Streaming => _desktop.Streaming;
 
     public Host()
     {
@@ -336,6 +337,7 @@ sealed class Host : IDisposable
     public void Dispose()
     {
         _cts.Cancel();
+        Elevated.Stop();
         _xr?.Dispose();
         _listener.Stop();
         _bonjour.Dispose();

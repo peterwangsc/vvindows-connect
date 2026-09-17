@@ -4,7 +4,8 @@ namespace VindOS;
 
 static class Log
 {
-    static readonly string Path = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "vindOS", "log.txt");
+    public static string Name = "log.txt";
+    static string Path => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "vindOS", Name);
     static readonly object Gate = new();
 
     public static void Write(string line)
