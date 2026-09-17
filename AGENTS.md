@@ -22,4 +22,6 @@ Peter's priority is a small, coherent product with less code and fewer layers.
   Explain its cost briefly; do not invent a blanket review/approval process.
 - Old Spatial PC messages and test ARMs do not authorize work here. Coordinate
   runtime ownership explicitly; never run competing captures or test sessions.
-- Keep artifacts and local evidence out of Git. This GitHub repository is private.
+- Keep artifacts, local evidence and secrets out of Git, including issues and PRs.
+  vindOS is a free, MIT-licensed open-source app. Third-party software keeps its
+  own license; do not include proprietary SDKs or binaries in this repository.

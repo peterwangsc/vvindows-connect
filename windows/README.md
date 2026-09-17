@@ -25,6 +25,19 @@ No PIN, second approval, device list or Windows-side Connect button.
 
 ## Build
 
+Install the .NET 10 SDK and Visual Studio 2022 (Community or Build Tools)
+with Desktop development with C++ and the Windows SDK. Put `dotnet` on PATH.
+Run `windows\build.cmd` from the repository root. NuGet restores QRCoder and
+OpenXR.Loader; no NVIDIA SDK headers are needed to compile the native module.
+
+The current app project expects the x64 OpenComposite `openvr_api.dll` at
+`windows\vendor\opencomposite\openvr_api.dll`. Obtain it from the
+[upstream OpenXR branch](https://gitlab.com/znixian/OpenOVR/-/tree/openxr),
+retaining its license and corresponding source when distributing a build.
+See [third-party notices](../THIRD_PARTY_NOTICES.md). NVIDIA runtime files are
+user-supplied at runtime; the `vendor/Server` layout above is a development
+convenience, not required for compilation.
+
 `build.cmd` builds the native module with Visual Studio 2022 MSBuild (v143)
 and then the app with the .NET 10 SDK. Output:
 `VindOS/bin/Release/net10.0-windows/win-x64/vindOS.exe`.
@@ -88,8 +101,7 @@ non-elevated for the OpenXR runtime selection). An app launched from an
 elevated terminal inherits that elevation, which is the usual way this shows
 up.
 
-Verified on hardware 2026-09-16: click, drag and virtual-keyboard text in
-Notepad. Wheel and physical-keyboard records still pending a headset run.
+Earlier hardware runs on 2026-09-16 verified click, drag, scroll, physical keyboard and visionOS keyboard input. Reverify the final release packages before launch.
 
 ## Immersive (WIRE.md v4)
 
@@ -165,7 +177,7 @@ session attached, the headset client stayed connected throughout.
 
 - Version: `<Version>` in `VindOS.csproj` (0.1.0); shown in the window header
   and in the startup log line.
-- Log: `%LOCALAPPDATA%indOS\log.txt` carries session events, process names,
+- Log: `%LOCALAPPDATA%\vindOS\log.txt` carries session events, process names,
   counts and error messages. Audited 2026-09-16: no line writes a token, the
   QR payload, a key, a certificate fingerprint or pointer coordinates.
 - NVIDIA CloudXR license (`vendor/Server/releases/6.2.3/LICENSE.txt`, same text
@@ -185,15 +197,15 @@ session attached, the headset client stayed connected throughout.
 - Tray: closing the window keeps vindOS running in the tray (Open / Quit in
   the tray menu); launching vindOS again restores the running instance's
   window (named event `vindOS-show`). Settings > This PC: "Start vindOS when I
-  sign in (in the tray)" writes `HKCU\...\RunindOS` with `--minimized`.
+  sign in (in the tray)" writes `HKCU\...\Run\vindOS` with `--minimized`.
 - Not in v0: MSIX, auto-update, telemetry.
 
 ## Installer
 
-`installeruild.cmd [path	o\ISCC.exe]` builds the native module, publishes
+`installer\build.cmd [path\to\ISCC.exe]` builds the native module, publishes
 vindOS self-contained for win-x64 (no .NET install needed) and compiles
-`installerindOS.iss` with Inno Setup 6 into `installer\outindOS-<version>-setup.exe`.
-The installer is per-user (`%LOCALAPPDATA%\ProgramsindOS`, no elevation, so
+`installer\vindOS.iss` with Inno Setup 6 into `installer\out\vindOS-<version>-setup.exe`.
+The installer is per-user (`%LOCALAPPDATA%\Programs\vindOS`, no elevation, so
 the app never runs elevated and input injection keeps working), closes a running
 vindOS, and offers to start it. Uninstall first runs `vindOS.exe --restore-bridges`,
 which puts every game's original `openvr_api.dll` back, then removes the app and
@@ -202,9 +214,9 @@ the unpacked CloudXR files.
 The installer ships no NVIDIA files (`vendor\Server` is excluded from publish).
 On first start the window shows the setup card: download CloudXR Runtime 6.2.3
 and Stream Manager 6.1.0 from NGC, drop both ZIPs into
-`%LOCALAPPDATA%indOS\CloudXR`, click Check again; `CloudXr.Import` recognises
+`%LOCALAPPDATA%\vindOS\CloudXR`, click Check again; `CloudXr.Import` recognises
 each archive by content and unpacks `Server\`, `NvStreamManagerClient.dll` and
-`releases.2.3\`. The Stream Manager client DLL is loaded from that folder
+`releases\6.2.3\`. The Stream Manager client DLL is loaded from that folder
 through a `DllImportResolver`. A development checkout that has `vendor\Server`
 next to the exe is used when the user folder is incomplete.
 
@@ -212,7 +224,12 @@ Verified 2026-09-16: silent install, setup card shown, both ZIPs imported
 (`cloudxr import: Runtime (...), Stream Manager (...); installed=True`), host
 started with `NvStreamManager.exe` running from the user folder, pair intact.
 Peter ruled on 2026-09-16 ("proceed as is"): CloudXR stays user-supplied,
-v0 ships unsigned, the product name is vindOS, and the installer shows
-`installer\LICENSE.txt` (the vindOS Pre-release License) on its license page.
+v0 ships unsigned, the product name is vindOS, and the original installer
+showed the vindOS Pre-release License. The open-source installer now uses the
+root MIT `LICENSE` and installs it with `THIRD_PARTY_NOTICES.md`.
 Unsigned means Windows SmartScreen shows "Windows protected your PC / Unknown
 publisher" on first run of the setup; More info → Run anyway continues.
+
+The notices index alone is not a complete binary license bundle. Finish the
+corresponding-source and upstream-notice work in [LAUNCH.md](../LAUNCH.md)
+before publishing a new installer.

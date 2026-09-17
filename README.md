@@ -1,65 +1,101 @@
-# VVindows Connect
+# vindOS
 
-Your Windows PC on Apple Vision Pro.
+**Your Windows PC on Apple Vision Pro. Free and open source.**
 
-Private, greenfield monorepo. Swift/SwiftUI on Apple; C# on Windows.
-This repository starts from zero. No Spatial PC source, build artifacts,
-credentials, or protocol compatibility are carried forward.
+Use your Windows desktop in a window, move into an immersive screen, and
+play supported Steam VR games on your headset. No vindOS subscription,
+paid unlocks, or account required.
 
-## Product
+vindOS is for people who want an alternative to paid desktop-streaming apps.
+It is an early release with a small tested hardware and game set; it does
+not promise feature parity or compatibility with every PC or VR game.
 
-One headset, one PC, one saved connection.
+[Website](https://www.peterwang.tech/vindos) ·
+[Support](https://www.peterwang.tech/vindos/support) ·
+[MIT license](LICENSE)
 
-1. Click **Pair** on Windows. Click **Pair** on Vision Pro and select the PC.
-2. Scan the Windows QR code and accept the required Apple permission.
-3. Pairing finishes at **Connect**. Nothing opens automatically.
-4. **Connect** opens the desktop in a window.
-5. Fullscreen requests **Immersive Mode** using the saved pairing.
+## Availability
 
-No PIN, second PC approval, device list, or setup instructions filling the UI.
-Settings contains **Forget connection**. Pair again to change devices.
-Platform-owned permission UI remains platform-owned.
+**Pre-release 0.1.0.** The Windows pre-release is linked from the website.
+It is unsigned and Windows may show an unknown-publisher warning. The
+Vision Pro app has been uploaded to TestFlight; a public invitation is not
+available yet. Public app launch is pending the items in [LAUNCH.md](LAUNCH.md).
 
-## Layout
+The source is available here for both apps. This repository was originally
+named VVindows Connect; the product is **vindOS**.
 
-- `apple/` — the visionOS app.
-- `windows/` — the Windows app.
-- [ARCHITECTURE.md](ARCHITECTURE.md) — boundaries and implementation sequence.
+## Requirements
+
+- Apple Vision Pro running visionOS 26.4 or later.
+- Windows 11 x64 with an NVIDIA GPU. Hardware testing so far used an RTX 4070.
+- Both devices on the same trusted local network.
+- NVIDIA CloudXR Runtime **6.2.3** and Stream Manager **6.1.0**, downloaded
+  separately from [NVIDIA NGC](https://catalog.ngc.nvidia.com/).
+  NVIDIA account access and NVIDIA's terms apply separately. The current
+  app needs these components for setup and pairing, including windowed use.
+
+vindOS does not bundle NVIDIA software. On Windows, place the two downloaded
+ZIP archives in `%LOCALAPPDATA%\vindOS\CloudXR` and click **Check again**.
+See [support](https://www.peterwang.tech/vindos/support) for setup details.
+
+## Use it
+
+1. Click **Pair** on Windows, then **Pair** on Vision Pro and select the PC.
+2. Scan the Windows QR code and accept Apple's permission prompt.
+3. Click **Connect** to open your desktop. Pairing does not connect automatically.
+4. Use fullscreen for **Immersive Mode**; use **Windowed** to return.
+5. For VR games, restart Steam through vindOS in Windows Settings, then
+   launch the game from Steam. OpenVR titles need the OpenComposite bridge;
+   Settings can apply and restore it. OpenXR titles need no bridge.
+
+There is one saved connection. **Forget connection** in Settings clears it.
+Game bridge changes keep the original DLL beside the replacement; removing
+the bridge or uninstalling vindOS restores the original.
+
+## What has been tested
+
+Earlier hardware runs on **2026-09-16** verified pairing, saved reconnect,
+Forget, live windowed desktop, pointer/click/drag/scroll, physical and visionOS
+keyboard input, immersive entry and return, and Steam handoff to and from
+**Assetto Corsa** using the PC's keyboard and mouse. These observations do
+not certify every later commit or a new release package.
+
+Known limits:
+
+- Windows running as administrator do not accept vindOS input. Run vindOS
+  as a normal user.
+- Mac Virtual Display's keyboard path is unavailable while its display is
+  hidden by an immersive space.
+- The windowed desktop uses pinned TLS 1.3. CloudXR immersive media is not
+  encrypted by the vendor; use a trusted network. See [SECURITY.md](SECURITY.md).
+- No end-to-end latency figure has been measured. Other GPUs and games have
+  not been established as supported by our hardware tests.
+
+## Build and contribute
+
+Two native apps: Swift/SwiftUI on Apple, C#/WPF on Windows, with one C++ DLL
+for Windows graphics and OpenXR. No hosted vindOS service is required.
+
+- [Apple build instructions](apple/README.md)
+- [Windows build instructions](windows/README.md)
+- [Architecture](ARCHITECTURE.md) and [wire format](WIRE.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Current milestone
 
-**Soft v0.** vindOS 0.1.0 (1) for Vision Pro is uploaded to App Store Connect
-for TestFlight. The Windows installer (per-user, unsigned, ships no NVIDIA
-files; the app imports the CloudXR Runtime and Stream Manager archives the user
-downloads from NGC) is built from `windows/` and published at
-https://cdn.golfcore.app/public/static/vindos/vindOS-0.1.0-setup.exe. The
-product site is https://peterwang.tech/vindos (download, support, privacy,
-license; `/spatial-pc` redirects there).
+**Free, open-source launch of v0.** Finish public distribution, licensing
+notices, and a complete install-to-connect check through both actual apps
+before adding another feature. [LAUNCH.md](LAUNCH.md) tracks readiness and
+contains announcement copy.
 
-Verified on hardware on 2026-09-16:
+## License and privacy
 
-- Pair once through both apps: Windows Pair, Vision Pro Pair, select the PC,
-  scan the QR, no PC click. Restart keeps the pair; Forget clears it on both
-  sides; a later pair with the same PC skips the QR.
-- Windowed desktop: Connect opens the Windows desktop in a window over a pinned
-  TLS 1.3 connection whose credentials arrived over the Apple-authenticated
-  pairing session. Motion is visible, Disconnect and reconnect work.
-- Input: pointer, click, drag, trackpad scroll, physical keyboard and the
-  visionOS keyboard all reach Windows. Windows running as administrator ignore
-  injected input (UIPI); vindOS runs as a normal user.
-- Fullscreen: the desktop on a large screen placed in front of the viewer;
-  the Crown dials the surroundings; a pinch on the surroundings shows a panel
-  with Recenter and Windowed, another hides it. Windowed, Apple's Exit, the
-  Crown and the Home gesture all return to the live desktop window.
-- Games: Steam runs through vindOS once restarted from Settings; Play inside
-  Steam on the big screen hands the screen to the game, which recenters once
-  on take-over; quitting returns the desktop (Assetto Corsa, driven with the
-  PC's keyboard and mouse).
+vindOS source is [MIT-licensed](LICENSE). Third-party components retain their
+own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). MIT permits
+commercial forks; the official vindOS app is intended to remain free.
 
-Decided for v0: NVIDIA CloudXR is not bundled (the user downloads it from NGC
-and vindOS imports it); the installer is unsigned and says so; the product is
-vindOS; the installer carries a pre-release license. Before a public link:
-revisit CloudXR redistribution and buy a code-signing certificate. The MacBook
-keyboard cannot reach
-the headset in Fullscreen because Mac Virtual Display is hidden inside
-immersive spaces. No latency figure has been measured.
+vindOS has no app analytics, advertising, or subscription service. Pairing
+credentials stay in Apple Keychain and Windows current-user DPAPI storage.
+Windows keeps a local diagnostic log that can contain device names, network
+addresses, game/process names, and file paths. Review it before sharing.
+See the [privacy policy](https://www.peterwang.tech/vindos/privacy).
