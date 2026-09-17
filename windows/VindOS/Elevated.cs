@@ -94,18 +94,37 @@ static class Elevated
         }
         Log.Write($"input process serving parent {parent}");
         var buffer = new byte[Input.Size];
+        var keys = new HashSet<(ushort Scan, uint Flags)>();
         int events = 0, failures = 0;
-        uint last = 0;
+        uint last = 0, buttons = 0;
         try
         {
             while (true)
             {
                 pipe.ReadExactly(buffer);
                 events++;
+                var flags = BitConverter.ToUInt32(buffer, buffer[0] == 1 ? 12 : 20);
+                if (buffer[0] == 1) { var key = (BitConverter.ToUInt16(buffer, 10), flags & ~2u); if ((flags & 2) != 0) keys.Remove(key); else keys.Add(key); }
+                else buttons = (buttons | (flags & 0x2A)) & ~((flags & 0x54) >> 1);
                 if (SendInput(1, buffer, buffer.Length) == 0) { failures++; last = (uint)Marshal.GetLastWin32Error(); }
             }
         }
         catch (Exception e) when (e is IOException or EndOfStreamException) { }
-        Log.Write($"input process ended events={events} failures={failures} lastError={last}");
+        foreach (var (scan, flags) in keys)
+        {
+            Array.Clear(buffer);
+            buffer[0] = 1;
+            BitConverter.TryWriteBytes(buffer.AsSpan(10), scan);
+            BitConverter.TryWriteBytes(buffer.AsSpan(12), flags | 2);
+            SendInput(1, buffer, buffer.Length);
+        }
+        for (var down = 2u; down <= 0x20; down <<= 2)
+        {
+            if ((buttons & down) == 0) continue;
+            Array.Clear(buffer);
+            BitConverter.TryWriteBytes(buffer.AsSpan(20), down << 1);
+            SendInput(1, buffer, buffer.Length);
+        }
+        Log.Write($"input process ended events={events} failures={failures} lastError={last} released keys={keys.Count} buttons={buttons:x}");
     }
 }
