@@ -18,6 +18,12 @@ public partial class App : System.Windows.Application
             Shutdown();
             return;
         }
+        if (e.Args.Contains("--input"))
+        {
+            try { Elevated.Serve(e.Args); } catch (Exception x) { Log.Write($"input process failed {x.GetType().Name} {x.Message}"); }
+            Shutdown();
+            return;
+        }
         if (!FirstInstance) { Show.Set(); Shutdown(); return; }
         base.OnStartup(e);
     }

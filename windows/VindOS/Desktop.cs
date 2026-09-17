@@ -125,6 +125,7 @@ sealed class Desktop : IDisposable
             var lastReport = Environment.TickCount64;
             vindos_desktop_rect(out var left, out var top, out var right, out var bottom);
             var input = new Input(left, top, right - left, bottom - top);
+            new Thread(Elevated.Start) { IsBackground = true }.Start();
             var reader = Task.Run(async () =>
             {
                 try
