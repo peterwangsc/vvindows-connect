@@ -21,9 +21,19 @@ source (including its build files and required submodule sources) and all
 applicable notices alongside it. A moving branch link alone is not a record
 of the source used to build a shipped DLL.
 
-The existing local bridge binary has no accompanying source provenance in this
-repository. Resolving that is a release task in [LAUNCH.md](LAUNCH.md), not a
-reason to silently remove game support or claim the binary is MIT-licensed.
+The Windows bridge is upstream OpenComposite revision
+`a27e7e6a64bdcd1eff6b7fba1ea2ea34bcf1273d`, AppVeyor build 52366409 (1.0.1539),
+x64. Its binary matches the [upstream build artifact](https://opencomposite.znix.xyz/builds/view_build?commit=a27e7e6a64bdcd1eff6b7fba1ea2ea34bcf1273d).
+The installer includes `opencomposite/source.tar.gz`: the upstream source,
+build files, license notices and the exact pinned submodules. Extract it with
+`tar -xzf source.tar.gz` and follow its README and `appveyor.yml` to build.
+The source retains the upstream licenses of OpenVR headers, INIH, GLM,
+OpenXR, JsonCpp, libunwind and other included code.
+
+Installed `licenses/` contains the QRCoder, OpenXR loader, OpenComposite and
+.NET/Windows Desktop license texts and notices. This Windows release pins
+the .NET runtime to 10.0.12; refresh its license texts and notices when changing
+that version. Source archives and third-party binaries remain outside Git.
 
 The Windows installer excludes NVIDIA runtime files. Users download and
 accept NVIDIA's terms themselves; vindOS imports their archives locally.

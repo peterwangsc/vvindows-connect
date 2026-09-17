@@ -11,7 +11,8 @@
     <RootNamespace>VindOS</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
+    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationIcon>vindOS.ico</ApplicationIcon>
   </PropertyGroup>

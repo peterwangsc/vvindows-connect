@@ -7,6 +7,7 @@ if not exist "%ISCC%" (
   exit /b 1
 )
 call "%~dp0..\build.cmd" || exit /b 1
+if exist "%~dp0..\VindOS\bin\publish" rmdir /s /q "%~dp0..\VindOS\bin\publish"
 dotnet publish "%~dp0..\VindOS\VindOS.csproj" -c Release -r win-x64 --self-contained true -o "%~dp0..\VindOS\bin\publish" -nologo -v:q || exit /b 1
 "%ISCC%" "%~dp0vindOS.iss" || exit /b 1
 echo Installer in %~dp0out

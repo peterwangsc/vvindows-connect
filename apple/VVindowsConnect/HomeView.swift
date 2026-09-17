@@ -70,6 +70,7 @@ struct HomeView: View {
                         }
                         .disabled(connection.pair == nil)
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                        Link("Privacy Policy", destination: URL(string: "https://www.peterwang.tech/vindos/privacy")!)
                     }
                     .navigationTitle("Settings")
                     .toolbar { Button("Done") { showingSettings = false } }

@@ -219,6 +219,28 @@ session attached, the headset client stayed connected throughout.
 
 ## Installer
 
+The next public package is version 0.1.1, with the MIT license, dependency license
+texts and the matching OpenComposite source archive. The self-contained .NET
+runtime is pinned to 10.0.12 to match the notices in `installer/licenses/`.
+Refresh those notices when updating the runtime.
+
+Before compiling the installer, prepare
+`vendor/opencomposite/source.tar.gz` from OpenComposite revision
+`a27e7e6a64bdcd1eff6b7fba1ea2ea34bcf1273d`, including its initialized recursive
+submodules and build files, excluding Git metadata. The bridge DLL must be
+the matching x64 artifact from upstream AppVeyor build 52366409. The installer
+requires the archive and installs it beside the bridge; see
+`../THIRD_PARTY_NOTICES.md`. Keep the source checkout and archive out of Git.
+
+From the repository root, prepare that source archive with Git and `tar`:
+
+```sh
+git clone --no-checkout https://gitlab.com/znixian/OpenOVR.git .local/opencomposite-source
+git -C .local/opencomposite-source checkout a27e7e6a64bdcd1eff6b7fba1ea2ea34bcf1273d
+git -C .local/opencomposite-source submodule update --init --recursive
+tar --exclude=.git -czf windows/vendor/opencomposite/source.tar.gz -C .local opencomposite-source
+```
+
 `installer\build.cmd [path\to\ISCC.exe]` builds the native module, publishes
 vindOS self-contained for win-x64 (no .NET install needed) and compiles
 `installer\vindOS.iss` with Inno Setup 6 into `installer\out\vindOS-<version>-setup.exe`.
