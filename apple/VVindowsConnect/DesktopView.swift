@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DesktopView: View {
     let desktop: Desktop
+    @State private var keyboardRequest = 0
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -20,14 +21,41 @@ struct DesktopView: View {
 
     var body: some View {
         ZStack {
-            VideoView(stream: desktop.video, frameSize: frameSize) { desktop.send($0) }
+            VideoView(stream: desktop.video, frameSize: frameSize, keyboardRequest: keyboardRequest) { desktop.send($0) }
             switch desktop.state {
             case .connecting: ProgressView("Connecting…")
             case .failed: Text("Could not reach the PC. Check that vindOS is running on it, then Connect again.").padding().glassBackgroundEffect()
             default: EmptyView()
             }
         }
-        .aspectRatio(16 / 9, contentMode: .fit)
+        .frame(minWidth: 480, minHeight: 480 * frameSize.height / frameSize.width)
+        .ignoresSafeArea()
+        .ornament(attachmentAnchor: .scene(.topLeading), contentAlignment: .topTrailing) {
+            DesktopControl("Disconnect", symbol: "chevron.left") {
+                desktop.disconnect()
+                toHome()
+            }
+            .padding(.trailing, 16)
+            .padding(.top, 12)
+        }
+        .ornament(attachmentAnchor: .scene(.topTrailing), contentAlignment: .topLeading) {
+            if case .streaming = desktop.state {
+                DesktopControl("Fullscreen", symbol: "arrow.up.left.and.arrow.down.right") {
+                    desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace)
+                }
+                .disabled(desktop.immersion != .off)
+                .padding(.leading, 16)
+                .padding(.top, 12)
+            }
+        }
+        .ornament(attachmentAnchor: .scene(.bottomTrailing), contentAlignment: .bottomLeading) {
+            if case .streaming = desktop.state {
+                DesktopControl("Show Keyboard", symbol: "keyboard") { keyboardRequest += 1 }
+                    .disabled(desktop.immersion != .off)
+                    .padding(.leading, 16)
+                    .padding(.bottom, 12)
+            }
+        }
         .onAppear {
             #if targetEnvironment(simulator)
             SimulatorScript.actions["fullscreen"] = { desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
@@ -61,22 +89,36 @@ struct DesktopView: View {
         .onChange(of: desktop.state) { _, state in
             if state == .idle { toHome() }
         }
-        .ornament(attachmentAnchor: .scene(.top)) {
-            HStack(spacing: 16) {
-                Button("Disconnect") {
-                    desktop.disconnect()
-                    toHome()
+    }
+}
+
+private struct DesktopControl: View {
+    let title: String
+    let symbol: String
+    let action: () -> Void
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+
+    init(_ title: String, symbol: String, action: @escaping () -> Void) {
+        self.title = title
+        self.symbol = symbol
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.title3.weight(.semibold))
+                .frame(width: 52, height: 52)
+                .background(.thinMaterial, in: Circle())
+                .hoverEffect { effect, active, _ in
+                    effect.opacity(active || voiceOverEnabled ? 1 : 0)
                 }
-                if case .streaming = desktop.state {
-                    switch desktop.immersion {
-                    case .off: Button("Fullscreen") { desktop.enterImmersive(open: openImmersiveSpace, dismiss: dismissImmersiveSpace) }
-                    default: ProgressView()
-                    }
-                }
-            }
-            .padding(8)
-            .glassBackgroundEffect()
         }
+        .buttonStyle(.plain)
+        .contentShape([.interaction, .hoverEffect], Rectangle())
+        .hoverEffect(.highlight)
+        .hoverEffectGroup()
+        .accessibilityLabel(title)
     }
 }
 

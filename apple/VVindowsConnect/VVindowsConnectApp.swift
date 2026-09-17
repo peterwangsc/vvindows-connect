@@ -18,6 +18,7 @@ struct VVindowsConnectApp: App {
         WindowGroup(id: "home") { HomeView(connection: connection, desktop: desktop) }
             .defaultSize(width: 480, height: 320)
         WindowGroup(id: "desktop") { DesktopView(desktop: desktop) }
+            .windowStyle(.plain)
             .defaultSize(width: 1600, height: 900)
             .windowResizability(.contentSize)
             .restorationBehavior(.disabled)

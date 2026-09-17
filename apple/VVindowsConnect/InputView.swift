@@ -2,7 +2,10 @@ import UIKit
 
 final class InputView: UIView, UIKeyInput {
     var send: ((Input) -> Void)?
-    var frameSize = CGSize(width: 16, height: 9)
+    var frameSize = CGSize(width: 16, height: 9) {
+        didSet { updateWindowAspect() }
+    }
+    private var appliedAspect: CGFloat?
     private var scroll = CGPoint.zero
     var hasText: Bool { false }
     override var canBecomeFirstResponder: Bool { true }
@@ -21,6 +24,30 @@ final class InputView: UIView, UIKeyInput {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        appliedAspect = nil
+        updateWindowAspect()
+    }
+
+    private func updateWindowAspect() {
+        guard frameSize.width > 0, frameSize.height > 0,
+              let scene = window?.windowScene else { return }
+        let aspect = frameSize.width / frameSize.height
+        guard aspect.isFinite, appliedAspect != aspect else { return }
+        appliedAspect = aspect
+        let width = max(480, scene.effectiveGeometry.coordinateSpace.bounds.width)
+        // Lock the native window, not just the video inside a freely resized window.
+        scene.requestGeometryUpdate(.Vision(
+            size: CGSize(width: width, height: width / aspect),
+            minimumSize: CGSize(width: 480, height: 480 / aspect),
+            resizingRestrictions: .uniform
+        )) { [weak self] error in
+            self?.appliedAspect = nil
+            NSLog("Could not match desktop window aspect ratio: %@", error.localizedDescription)
+        }
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()

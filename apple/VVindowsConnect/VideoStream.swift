@@ -74,11 +74,20 @@ final class VideoStream {
 struct VideoView: UIViewRepresentable {
     let stream: VideoStream
     let frameSize: CGSize
+    let keyboardRequest: Int
     let send: (Input) -> Void
+
+    final class Coordinator {
+        var keyboardRequest = 0
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> InputView {
         stream.layer.videoGravity = .resizeAspect
         let view = InputView()
+        view.backgroundColor = .clear
+        view.isOpaque = false
         view.layer.addSublayer(stream.layer)
         return view
     }
@@ -86,5 +95,11 @@ struct VideoView: UIViewRepresentable {
     func updateUIView(_ view: InputView, context: Context) {
         view.frameSize = frameSize
         view.send = send
+        if context.coordinator.keyboardRequest != keyboardRequest {
+            context.coordinator.keyboardRequest = keyboardRequest
+            // Reopen even if the system dismissed the keyboard while retaining focus.
+            if view.isFirstResponder { view.resignFirstResponder() }
+            view.becomeFirstResponder()
+        }
     }
 }
