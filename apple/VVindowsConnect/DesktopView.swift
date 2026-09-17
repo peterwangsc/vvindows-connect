@@ -4,6 +4,7 @@ import SwiftUI
 struct DesktopView: View {
     let desktop: Desktop
     @State private var keyboardRequest = 0
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -17,6 +18,14 @@ struct DesktopView: View {
     private func toHome() {
         openWindow(id: "home")
         dismissWindow(id: "desktop")
+    }
+
+    private func returnHomeIfDisconnected() {
+        guard scenePhase == .active else { return }
+        switch desktop.state {
+        case .idle, .failed: toHome()
+        default: break
+        }
     }
 
     var body: some View {
@@ -64,14 +73,24 @@ struct DesktopView: View {
             #endif
             desktop.reopening = false
             desktop.desktopWindows += 1
-            if desktop.state == .idle { return openWindow(id: "home") }
-            dismissWindow(id: "home")
+            switch desktop.state {
+            case .idle, .failed: returnHomeIfDisconnected()
+            default: dismissWindow(id: "home")
+            }
         }
         .onDisappear {
             desktop.desktopWindows -= 1
             Task {
                 try? await Task.sleep(for: .seconds(1))
                 if desktop.desktopWindows == 0, desktop.immersion == .off, !desktop.reopening { desktop.disconnect() }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Closing the last window backgrounds it without calling onDisappear.
+            if phase == .background, desktop.immersion == .off, !desktop.reopening {
+                desktop.disconnect()
+            } else if phase == .active {
+                returnHomeIfDisconnected()
             }
         }
         .onChange(of: desktop.immersion) { _, immersion in
@@ -86,8 +105,8 @@ struct DesktopView: View {
             default: break
             }
         }
-        .onChange(of: desktop.state) { _, state in
-            if state == .idle { toHome() }
+        .onChange(of: desktop.state) { _, _ in
+            returnHomeIfDisconnected()
         }
     }
 }
@@ -162,7 +181,7 @@ struct ImmersiveContent: View {
         } attachments: {
             Attachment(id: "hud") {
                 VStack(spacing: 12) {
-                    Text(status).font(.headline)
+                    Text(status).font(.headline).padding(.trailing, 40)
                     HStack(spacing: 12) {
                         Button("Recenter") { desktop.recenter() }.buttonStyle(.borderedProminent)
                         Button("Windowed") { desktop.leaveImmersive() }
@@ -171,6 +190,18 @@ struct ImmersiveContent: View {
                 .controlSize(.large)
                 .padding(20)
                 .glassBackgroundEffect()
+                .overlay(alignment: .topTrailing) {
+                    Button { hudShown = false } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
+                    .accessibilityLabel("Hide controls")
+                    .padding(8)
+                }
                 .frame(width: 20000, height: 12000)
                 .contentShape(Rectangle())
                 .onTapGesture { hudShown = false }

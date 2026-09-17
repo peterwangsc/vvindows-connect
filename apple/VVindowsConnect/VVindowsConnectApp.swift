@@ -22,6 +22,7 @@ struct VVindowsConnectApp: App {
             .defaultSize(width: 1600, height: 900)
             .windowResizability(.contentSize)
             .restorationBehavior(.disabled)
+            .defaultLaunchBehavior(.suppressed)
         #if targetEnvironment(simulator)
         ImmersiveSpace(id: "immersive") { ImmersiveContent(connection: connection, desktop: desktop) }
         #else

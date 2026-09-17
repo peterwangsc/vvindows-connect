@@ -14,6 +14,10 @@ struct HomeView: View {
                 if case .failed(let reason) = connection.activity {
                     Text(reason).foregroundStyle(.secondary)
                 }
+                if case .failed = desktop.state {
+                    Text("The desktop connection ended. Connect to try again.")
+                        .foregroundStyle(.secondary)
+                }
                 action
             }
             .padding(32)
@@ -25,7 +29,13 @@ struct HomeView: View {
                 #endif
                 connection.homeWindows += 1
                 if connection.homeWindows > 1 { return dismissWindow() }
-                if desktop.desktopWindows > 0, desktop.state == .idle || desktop.immersion != .off { dismissWindow(id: "desktop") }
+                if desktop.desktopWindows > 0 {
+                    switch desktop.state {
+                    case .idle, .failed: dismissWindow(id: "desktop")
+                    default:
+                        if desktop.immersion != .off { dismissWindow(id: "desktop") }
+                    }
+                }
             }
             .onDisappear { connection.homeWindows -= 1 }
             .onChange(of: desktop.session.status) { _, status in
